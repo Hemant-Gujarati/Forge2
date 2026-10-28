@@ -52,6 +52,30 @@ By default, Forge operates in safe mode:
 
 ---
 
+## 📦 How to Get Forge on Any PC
+
+There are two easy ways to get Forge:
+
+### Option A: Standalone Windows Application (`forge.exe`) — Zero Setup Required!
+You do **not** need Python, Git, or pip installed.
+1. Download **`forge.exe`** from [GitHub Releases](https://github.com/Hemant-Gujarati/Forge2/releases).
+2. Double-click `forge.exe` or place it in your PATH / Desktop to run it anytime.
+3. To build the `.exe` yourself locally:
+   ```cmd
+   build.bat
+   ```
+   This generates `dist/forge.exe` in seconds.
+
+### Option B: From Source (Python 3.10+)
+```bash
+git clone https://github.com/Hemant-Gujarati/Forge2.git
+cd Forge2
+pip install -e .
+forge
+```
+
+---
+
 ## 📱 Three Ways to Control Forge
 
 ### 1. Windows / Linux Terminal CLI
