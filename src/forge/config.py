@@ -1,9 +1,10 @@
 """Configuration management for Forge CLI."""
 
 import os
-import yaml
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 CONFIG_DIR = Path.home() / ".forge"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
@@ -54,6 +55,7 @@ DEFAULT_CONFIG = {
 
 class ConfigValidationError(Exception):
     """Raised when configuration validation fails."""
+
     pass
 
 
@@ -114,7 +116,9 @@ class Config:
         prov = self.default_provider
         providers = self.data.get("providers", {})
         if prov not in providers:
-            issues.append(f"Default provider '{prov}' is not defined under providers in configuration.")
+            issues.append(
+                f"Default provider '{prov}' is not defined under providers in configuration."
+            )
 
         # Check server settings
         server = self.data.get("server", {})
@@ -132,6 +136,7 @@ class Config:
     def _deep_merge(self, base: dict, override: dict) -> dict:
         """Deep merge override into a copy of base."""
         import copy
+
         result = copy.deepcopy(base)
         for key, value in override.items():
             if key in result and isinstance(result[key], dict) and isinstance(value, dict):

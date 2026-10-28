@@ -1,22 +1,27 @@
 """Test agentic loop, tool chaining, session save/load, and slash commands."""
 
-import os
-import sys
 import json
-import tempfile
+import os
 import shutil
+import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import unittest
 from typing import Generator
-from forge.config import Config, SESSIONS_DIR
+
+from forge.config import SESSIONS_DIR
 from forge.providers.base import (
-    BaseProvider, StreamEvent, TextDelta, ToolCallEvent, ToolCall, DoneEvent
+    BaseProvider,
+    DoneEvent,
+    StreamEvent,
+    TextDelta,
+    ToolCall,
+    ToolCallEvent,
 )
 from forge.tools.registry import execute_tool, get_tool_definitions
-from forge.server.tasks import TaskQueue
 
 
 class MockAgenticProvider(BaseProvider):
@@ -28,26 +33,39 @@ class MockAgenticProvider(BaseProvider):
         super().__init__({"default_model": "mock-model"})
         self.call_count = 0
 
-    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> Generator[StreamEvent, None, None]:
+    def chat(
+        self, messages: list[dict], tools: list[dict] | None = None
+    ) -> Generator[StreamEvent, None, None]:
         self.call_count += 1
         if self.call_count == 1:
             # First turn: model decides to create a file
             yield TextDelta("I will create the file for you.\n")
-            yield ToolCallEvent(ToolCall(
-                id="call_mock_1",
-                name="write_file",
-                arguments={"path": "test_created.txt", "content": "mock file content"},
-            ))
+            yield ToolCallEvent(
+                ToolCall(
+                    id="call_mock_1",
+                    name="write_file",
+                    arguments={"path": "test_created.txt", "content": "mock file content"},
+                )
+            )
             yield DoneEvent()
         elif self.call_count == 2:
             # Second turn: after seeing write_file result, model edits the file
-            assert any(m.get("role") == "tool" and "Successfully wrote" in m.get("content", "") for m in messages)
+            assert any(
+                m.get("role") == "tool" and "Successfully wrote" in m.get("content", "")
+                for m in messages
+            )
             yield TextDelta("Now editing the file.\n")
-            yield ToolCallEvent(ToolCall(
-                id="call_mock_2",
-                name="edit_file",
-                arguments={"path": "test_created.txt", "old_text": "mock", "new_text": "super mock"},
-            ))
+            yield ToolCallEvent(
+                ToolCall(
+                    id="call_mock_2",
+                    name="edit_file",
+                    arguments={
+                        "path": "test_created.txt",
+                        "old_text": "mock",
+                        "new_text": "super mock",
+                    },
+                )
+            )
             yield DoneEvent()
         else:
             # Final turn: model gives summary
@@ -94,7 +112,9 @@ class TestAgenticLoop(unittest.TestCase):
 
             msg = {"role": "assistant", "content": text_buffer}
             if tool_calls:
-                msg["tool_calls"] = [{"id": tc.id, "name": tc.name, "arguments": tc.arguments} for tc in tool_calls]
+                msg["tool_calls"] = [
+                    {"id": tc.id, "name": tc.name, "arguments": tc.arguments} for tc in tool_calls
+                ]
             messages.append(msg)
 
             if text_buffer:
@@ -105,12 +125,14 @@ class TestAgenticLoop(unittest.TestCase):
 
             for tc in tool_calls:
                 res = execute_tool(tc.name, tc.arguments)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": tc.name,
-                    "content": res,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "name": tc.name,
+                        "content": res,
+                    }
+                )
 
         # Verify the file was created and edited
         self.assertTrue(os.path.exists("test_created.txt"))
@@ -133,6 +155,7 @@ class TestSessionPersistence(unittest.TestCase):
 
     def test_save_and_load(self):
         from forge.app import ForgeApp
+
         app = ForgeApp(provider_name="ollama")
         app.messages = [
             {"role": "system", "content": "System prompt"},

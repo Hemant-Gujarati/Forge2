@@ -1,12 +1,10 @@
 """Approval management system for safe agent operations."""
 
-import time
 import threading
-from typing import Callable
 from pathlib import Path
-from forge.db import (
-    create_approval, get_approval, update_approval_status, list_pending_approvals
-)
+from typing import Callable
+
+from forge.db import create_approval, get_approval, update_approval_status
 
 # Actions that modify filesystem, execute system commands, or commit changes
 DESTRUCTIVE_ACTIONS = {
@@ -52,7 +50,7 @@ def format_action_summary(name: str, arguments: dict) -> str:
         case "run_command":
             return f"Execute command: `{arguments.get('command', '')}`"
         case "git_commit":
-            return f"Git commit: \"{arguments.get('message', '')}\""
+            return f'Git commit: "{arguments.get("message", "")}"'
         case _:
             return f"Action: {name} with args {list(arguments.keys())}"
 

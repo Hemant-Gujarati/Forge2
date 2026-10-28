@@ -1,6 +1,5 @@
 """File operation tools for Forge."""
 
-import os
 import re
 from pathlib import Path
 
@@ -61,10 +60,7 @@ def edit_file(path: str, old_text: str, new_text: str) -> str:
 
         lines = content.splitlines()
         preview = "\n".join(lines[:20])
-        return (
-            f"Error: old_text not found in {p}.\n"
-            f"File starts with:\n{preview}\n..."
-        )
+        return f"Error: old_text not found in {p}.\nFile starts with:\n{preview}\n..."
     except Exception as e:
         return f"Error editing file: {e}"
 

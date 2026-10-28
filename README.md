@@ -1,154 +1,150 @@
-# 🔨 Forge CLI
+# 🔨 Forge
 
-> AI-Powered Agentic Coding Assistant CLI with Multi-Provider Support & Remote Access.
+> AI-Powered Coding Assistant with Three Control Interfaces: CLI, Telegram, and Native Android.
 
-Forge is a terminal-based agentic coding assistant inspired by Antigravity and Codex. It works directly on your filesystem to inspect, edit, create, and manage code, run commands, and execute tasks autonomously — powered by online AI models (OpenAI, Anthropic Claude, Google Gemini) or 100% offline local LLMs via Ollama.
+```
+Windows/Linux CLI ─┐
+Telegram bot ─────┼─> Forge Runtime on your PC ─> Ollama (Local) / Online LLMs + Tools
+Native Android ───┘
+```
 
-Forge also supports remote control via **Telegram** (and WhatsApp), letting you send tasks from your phone and have Forge execute them on your machine in the background.
+Your PC remains the **only machine** that runs the AI model, reads files, edits code, executes terminal commands, and manages Git. Telegram and the Native Android app act as remote controllers.
 
----
-
-## ✨ Features
-
-- 🧠 **Multi-Provider Support**:
-  - **Local LLMs**: Ollama (`llama3.2`, `codellama`, `deepseek-coder`, `qwen2.5-coder`, etc.)
-  - **OpenAI**: `gpt-4o`, `o3-mini`, `gpt-4.5`, etc.
-  - **OpenAI-Compatible**: Groq, Together AI, OpenRouter, vLLM, LM Studio
-  - **Anthropic Claude**: `claude-3-7-sonnet`, `claude-3-5-sonnet`, etc.
-  - **Google Gemini**: `gemini-2.0-flash`, `gemini-2.5-pro`, etc.
-- ⚡ **Autonomous Agentic Loop**:
-  - The model inspects the codebase, reasons, uses tools, checks results, and fixes its own mistakes automatically.
-- 🛠️ **12 Built-in Tools**:
-  - `read_file` - Read files with size guards
-  - `write_file` - Create or overwrite files (auto-creates directories)
-  - `edit_file` - Targeted exact search-and-replace
-  - `delete_file` - Safely remove files or empty folders
-  - `list_directory` - Tree view of files and folder sizes
-  - `find_files` - Recursive glob file finder
-  - `search_text` - Fast regex/text grep across the project
-  - `run_command` - Shell command execution with stdout/stderr capture
-  - `git_status` - Working directory status
-  - `git_diff` - Staged and unstaged changes
-  - `git_commit` - Stage and commit
-  - `git_log` - Commit history
-- 📱 **Remote Access via Telegram & WhatsApp**:
-  - Control Forge from your phone
-  - Tasks run as background jobs on your PC
-  - Sends back execution results and code changes
-- 💬 **Interactive Terminal UI**:
-  - Rich markdown rendering and syntax highlighting
-  - Input history and tab navigation
-  - Quick slash commands (`/help`, `/model`, `/provider`, `/save`, `/load`, `/cd`, `/config`)
+Repository: **[https://github.com/Hemant-Gujarati/Forge2](https://github.com/Hemant-Gujarati/Forge2)**
 
 ---
 
-## 🚀 Quick Start
+## 🌟 Architecture & Highlights
 
-### Installation
+| Area | Choice | Cost |
+|------|--------|------|
+| **Desktop Core** | Python 3.11+ | Free |
+| **Local AI Engine** | Ollama (`llama3.2`, `codellama`, `deepseek-coder`, `qwen2.5-coder`) | Free |
+| **Online AI (Optional)** | OpenAI, Anthropic Claude, Google Gemini, Groq, OpenRouter | Optional API key |
+| **CLI Interface** | Rich terminal UI + `prompt-toolkit` | Free |
+| **Telegram Remote** | Telegram Bot API with Long Polling via `httpx` (no ngrok required) | Free |
+| **Android App** | Native Kotlin + Jetpack Compose (`android/`) | Free |
+| **Persistence** | SQLite (`~/.forge/forge.db`) for tasks, approvals, and sessions | Free |
+| **Config** | Human-readable YAML (`~/.forge/config.yaml`) | Free |
+| **Safety Engine** | Controlled approval system with pending, approved, rejected, and expired states | Free |
+| **Source Control** | Git + GitHub Actions CI | Free |
 
+---
+
+## 🛡️ Safety & Approval System (Phase 2 & 3)
+
+By default, Forge operates in safe mode:
+- **Read-only actions** (`read_file`, `list_directory`, `find_files`, `search_text`, `git_status`, `git_diff`, `git_log`) execute immediately.
+- **Destructive / modifying actions** require explicit human approval before running:
+  - `write_file` (creating/overwriting files)
+  - `edit_file` (modifying code)
+  - `delete_file` (deleting files/directories)
+  - `run_command` (shell execution)
+  - `git_commit` (committing changes)
+
+### How Approvals Work:
+1. When the agent attempts a modifying action, a pending approval record is created in SQLite.
+2. The user is prompted in their active interface:
+   - **CLI**: Interactive `[y/N]` prompt
+   - **Telegram**: Notification with `/approve <id>` and `/reject <id>` commands
+   - **Android**: Interactive card in the Approvals tab with "Approve" and "Reject" buttons
+3. Once approved, the agent continues its autonomous loop: edit -> test -> report.
+
+---
+
+## 📱 Three Ways to Control Forge
+
+### 1. Windows / Linux Terminal CLI
 ```bash
-git clone https://github.com/your-username/forge-cli.git
-cd forge-cli
+# Clone & install
+git clone https://github.com/Hemant-Gujarati/Forge2.git
+cd Forge2
 pip install -e .
-```
 
-Or run directly without installation:
-```bash
-python -m forge
-```
-
-### Basic Usage
-
-```bash
-# Start interactive session with default provider (Ollama)
+# Launch interactive coding session (Ollama default)
 forge
 
-# Chat with a specific provider and model
+# Or use specific models
+forge chat -p ollama -m llama3.2
 forge chat -p openai -m gpt-4o
 forge chat -p anthropic -m claude-3-7-sonnet
 forge chat -p gemini -m gemini-2.0-flash
-forge chat -p ollama -m qwen2.5-coder:7b
 
-# List available models
-forge models -p ollama
-forge models -p openai
-
-# Manage config
-forge config --set-key openai sk-...
-forge config --set-key anthropic sk-ant-...
-forge config --set-key gemini AIza...
-forge config --set-provider ollama
+# View config & models
 forge config --show
+forge models -p ollama
 ```
 
----
+### 2. Telegram Remote Control (Direct Long Polling)
+No public IP, port-forwarding, or ngrok required:
 
-## 📱 Remote Control via Telegram
-
-You can message Forge from your phone on Telegram to run tasks on your computer:
-
-1. **Create a bot on Telegram**:
-   - Message `@BotFather` on Telegram
-   - Send `/newbot` and follow instructions to get your `bot_token`
-
-2. **Configure Forge**:
+1. Create a bot with `@BotFather` on Telegram to receive your `bot_token`.
+2. Configure token and your chat ID:
    ```bash
    forge config --set-key telegram <YOUR_BOT_TOKEN>
    ```
-   Or edit `~/.forge/config.yaml`:
-   ```yaml
-   server:
-     telegram:
-       bot_token: "YOUR_BOT_TOKEN"
-       allowed_chat_ids: [123456789] # Optional: restrict to your Telegram user ID
-   ```
-
-3. **Start the server**:
+3. Start the server in long-polling mode:
    ```bash
-   forge serve --port 5000
+   forge serve --poll
    ```
+4. Commands supported in Telegram:
+   - `/help` - Display available commands
+   - `/new <task>` - Start a new autonomous background coding task
+   - `/tasks` - View recent tasks and their statuses
+   - `/status` - Check current PC runtime and working directory
+   - `/cancel <task_id>` - Abort an ongoing background task
+   - `/approve <id>` - Approve a pending file edit, command, or commit
+   - `/reject <id>` - Reject a pending action
 
-4. **Expose with a tunnel (ngrok)**:
-   ```bash
-   ngrok http 5000
-   ```
-
-5. **Register the webhook**:
-   ```bash
-   forge serve --setup-telegram https://<your-ngrok-subdomain>.ngrok-free.app
-   ```
-
-Now message your bot on Telegram:
-> "Create a python script that fetches the latest top Hacker News stories and saves them to a json file"
-
-Forge will execute the task on your PC and text you the result!
+### 3. Native Android App (`android/`)
+Located in the [`android/`](file:///android/) directory:
+- Built with **Kotlin + Jetpack Compose + Material 3**.
+- Direct connection over private Wi-Fi / VPN (Tailscale, WireGuard) to your desktop's Forge REST API.
+- **Screens**:
+  1. **Pairing**: Connect via desktop IP:port and secure 6-digit or UUID pairing token.
+  2. **Chat / Tasks**: Send coding prompts and receive real-time updates.
+  3. **Task Detail**: View task execution progress, full stdout/stderr, and tool logs.
+  4. **Approvals Screen**: View pending write/command/commit requests with one-tap Approve/Reject.
+  5. **Recent Tasks**: History of all tasks stored in desktop SQLite.
+  6. **Settings**: Connection status, token management, and desktop health.
 
 ---
 
-## 📂 Configuration
+## 🌐 Desktop REST API Endpoints (Phase 5)
 
-Configuration is stored at `~/.forge/config.yaml`:
+The Forge server exposes a secure authenticated API for Android and remote controllers:
 
-```yaml
-default_provider: ollama
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `GET` | `/health` | Health check & provider status | None |
+| `POST` | `/v1/pair` | Generate or verify pairing token | None / Pairing Token |
+| `POST` | `/v1/tasks` | Submit a new background task | Bearer Token |
+| `GET` | `/v1/tasks` | List recent tasks | Bearer Token |
+| `GET` | `/v1/tasks/{id}` | Get task details, status, and logs | Bearer Token |
+| `POST` | `/v1/tasks/{id}/cancel` | Cancel a running task | Bearer Token |
+| `GET` | `/v1/approvals` | List pending approvals | Bearer Token |
+| `POST` | `/v1/approvals/{id}/approve` | Approve a pending action | Bearer Token |
+| `POST` | `/v1/approvals/{id}/reject` | Reject a pending action | Bearer Token |
 
-providers:
-  ollama:
-    base_url: "http://localhost:11434"
-    default_model: "llama3.2"
-  openai:
-    api_key: "sk-..."
-    base_url: "https://api.openai.com/v1"
-    default_model: "gpt-4o"
-  anthropic:
-    api_key: "sk-ant-..."
-    base_url: "https://api.anthropic.com"
-    default_model: "claude-sonnet-4-20250514"
-  gemini:
-    api_key: "AIza..."
-    base_url: "https://generativelanguage.googleapis.com/v1beta"
-    default_model: "gemini-2.0-flash"
+---
+
+## 🧪 Testing & CI
+
+Run all 29 unit and integration tests with pytest in one command:
+
+```bash
+pytest
 ```
+
+Run code formatting and linting:
+
+```bash
+ruff check .
+ruff format .
+```
+
+GitHub Actions automatically runs tests on every push to `main`:
+[`.github/workflows/test.yml`](file:///.github/workflows/test.yml)
 
 ---
 

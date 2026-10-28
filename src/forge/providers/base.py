@@ -3,13 +3,14 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generator
-import json
+
 import httpx
 
 
 @dataclass
 class ToolCall:
     """Represents a tool call from the AI."""
+
     id: str
     name: str
     arguments: dict
@@ -18,24 +19,28 @@ class ToolCall:
 @dataclass
 class TextDelta:
     """A chunk of streamed text."""
+
     text: str
 
 
 @dataclass
 class ToolCallEvent:
     """A completed tool call to execute."""
+
     tool_call: ToolCall
 
 
 @dataclass
 class ErrorEvent:
     """An error from the provider."""
+
     message: str
 
 
 @dataclass
 class DoneEvent:
     """Signals the end of streaming."""
+
     pass
 
 
@@ -64,7 +69,9 @@ class BaseProvider(ABC):
         self.model = config.get("default_model", "")
         self.base_url = config.get("base_url", "").rstrip("/")
         self.api_key = config.get("api_key", "")
-        self.client = httpx.Client(timeout=httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0))
+        self.client = httpx.Client(
+            timeout=httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0)
+        )
 
     def set_model(self, model: str):
         """Switch to a different model."""

@@ -3,21 +3,24 @@
 import os
 import threading
 from functools import wraps
-from flask import Flask, request, jsonify
 
+from flask import Flask, jsonify, request
+
+from forge.approvals import ApprovalManager
 from forge.config import Config
 from forge.db import (
-    init_db, list_tasks as db_list_tasks, get_task as db_get_task,
-    list_pending_approvals, get_approval, create_pairing_token,
-    verify_pairing_token, revoke_pairing_token
+    create_pairing_token,
+    init_db,
+    list_pending_approvals,
+    verify_pairing_token,
 )
 from forge.server.tasks import TaskQueue
-from forge.server.whatsapp import WhatsAppHandler, TelegramHandler
-from forge.approvals import ApprovalManager
+from forge.server.whatsapp import TelegramHandler, WhatsAppHandler
 
 
 def require_auth(config: Config):
     """Decorator to require Bearer token authorization."""
+
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -33,7 +36,9 @@ def require_auth(config: Config):
                 return f(*args, **kwargs)
 
             return jsonify({"error": "Unauthorized: Invalid or revoked token"}), 401
+
         return decorated_function
+
     return decorator
 
 
@@ -56,17 +61,21 @@ def create_app(task_queue: TaskQueue | None = None) -> Flask:
     @app.route("/health", methods=["GET"])
     def health():
         """Health check endpoint for CLI and Android pairing."""
-        return jsonify({
-            "name": "Forge CLI Server",
-            "version": "0.1.0",
-            "status": "online",
-            "default_provider": config.default_provider,
-            "model": config.get_provider_config(config.default_provider).get("default_model", ""),
-            "safe_mode": config.safe_mode,
-            "cwd": os.getcwd(),
-            "telegram_enabled": tg_handler.enabled,
-            "whatsapp_enabled": wa_handler.enabled,
-        })
+        return jsonify(
+            {
+                "name": "Forge CLI Server",
+                "version": "0.1.0",
+                "status": "online",
+                "default_provider": config.default_provider,
+                "model": config.get_provider_config(config.default_provider).get(
+                    "default_model", ""
+                ),
+                "safe_mode": config.safe_mode,
+                "cwd": os.getcwd(),
+                "telegram_enabled": tg_handler.enabled,
+                "whatsapp_enabled": wa_handler.enabled,
+            }
+        )
 
     @app.route("/v1/pair", methods=["POST"])
     def pair():
@@ -91,12 +100,14 @@ def create_app(task_queue: TaskQueue | None = None) -> Flask:
 
         # Generate a dedicated client token for the phone
         device_token = create_pairing_token(client_name=client_name)
-        return jsonify({
-            "status": "paired",
-            "token": device_token,
-            "client_name": client_name,
-            "message": "Device successfully paired with Forge desktop runtime.",
-        })
+        return jsonify(
+            {
+                "status": "paired",
+                "token": device_token,
+                "client_name": client_name,
+                "message": "Device successfully paired with Forge desktop runtime.",
+            }
+        )
 
     # --- Legacy /api/task Endpoints for Backward Compatibility ---
 
@@ -128,11 +139,13 @@ def create_app(task_queue: TaskQueue | None = None) -> Flask:
             return jsonify({"error": "No prompt provided"}), 400
 
         task_id = task_queue.submit(prompt)
-        return jsonify({
-            "task_id": task_id,
-            "status": "submitted",
-            "prompt": prompt,
-        }), 201
+        return jsonify(
+            {
+                "task_id": task_id,
+                "status": "submitted",
+                "prompt": prompt,
+            }
+        ), 201
 
     @app.route("/v1/tasks", methods=["GET"])
     @require_auth(config)
@@ -211,16 +224,18 @@ def create_app(task_queue: TaskQueue | None = None) -> Flask:
 
         wa_handler.send_message(
             from_number,
-            f"🔨 *Forge* received your task:\n_{body[:200]}_\n\n⚙️ Processing in background..."
+            f"🔨 *Forge* received your task:\n_{body[:200]}_\n\n⚙️ Processing in background...",
         )
 
         def on_complete(result: str):
             wa_handler.send_message(from_number, f"🔨 *Forge Result:*\n\n{result}")
 
         task_queue.submit(body, callback=on_complete)
-        return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 200, {
-            "Content-Type": "text/xml"
-        }
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+            200,
+            {"Content-Type": "text/xml"},
+        )
 
     return app
 
@@ -251,7 +266,7 @@ def _process_telegram_message(
             "• `/cancel <id>` — Cancel a task\n"
             "• `/approve <id>` — Approve a pending action\n"
             "• `/reject <id>` — Reject a pending action\n"
-            "• `/help` — Show this message"
+            "• `/help` — Show this message",
         )
         return
 
@@ -265,7 +280,7 @@ def _process_telegram_message(
             "• `/cancel <id>` — Cancel a running task\n"
             "• `/approve <id>` — Approve pending dangerous action\n"
             "• `/reject <id>` — Reject pending dangerous action\n"
-            "• `/help` — Show help"
+            "• `/help` — Show help",
         )
         return
 
@@ -280,7 +295,7 @@ def _process_telegram_message(
             f"• Model: `{cfg.get_provider_config(cfg.default_provider).get('default_model', '')}`\n"
             f"• Safe Mode: `{'ON' if cfg.safe_mode else 'OFF'}`\n"
             f"• Directory: `{os.getcwd()}`\n"
-            f"• Active tasks: `{running}`"
+            f"• Active tasks: `{running}`",
         )
         return
 
@@ -292,7 +307,9 @@ def _process_telegram_message(
 
         lines = ["📋 *Recent Tasks:*\n"]
         for t in tasks:
-            status_icon = "🟢" if t["status"] == "done" else ("🟡" if t["status"] == "running" else "🔴")
+            status_icon = (
+                "🟢" if t["status"] == "done" else ("🟡" if t["status"] == "running" else "🔴")
+            )
             lines.append(f"{status_icon} `{t['id']}` [{t['status']}] — {t['prompt'][:60]}")
         tg_handler.send_message(chat_id, "\n".join(lines))
         return
@@ -335,8 +352,7 @@ def _process_telegram_message(
 
     # Notify task received
     tg_handler.send_message(
-        chat_id,
-        f"🔨 *Task received:*\n_{prompt[:250]}_\n\n⚙️ Processing on your PC..."
+        chat_id, f"🔨 *Task received:*\n_{prompt[:250]}_\n\n⚙️ Processing on your PC..."
     )
 
     # Callback when task completes
@@ -352,7 +368,7 @@ def _process_telegram_message(
                 f"Proposed action: *{summary}*\n\n"
                 f"Reply with:\n"
                 f"• `/approve {appr_id}`\n"
-                f"• `/reject {appr_id}`"
+                f"• `/reject {appr_id}`",
             )
 
     task_queue.submit(prompt, callback=on_complete, on_approval=on_approval_needed)
@@ -366,7 +382,7 @@ def start_server(host: str = "0.0.0.0", port: int = 5000, poll_telegram: bool = 
 
     config = Config()
     wa_config = config.data.get("server", {}).get("whatsapp", {})
-    tg_config = config.data.get("server", {}).get("telegram", {})
+    config.data.get("server", {}).get("telegram", {})
 
     task_queue = TaskQueue()
     tg_handler = TelegramHandler(config.data)
@@ -383,7 +399,9 @@ def start_server(host: str = "0.0.0.0", port: int = 5000, poll_telegram: bool = 
             console.print("     Mode: [bold green]Direct Long-Polling (no ngrok required!)[/]")
             poll_thread = threading.Thread(
                 target=tg_handler.poll_updates,
-                args=(lambda cid, txt: _process_telegram_message(tg_handler, task_queue, cid, txt),),
+                args=(
+                    lambda cid, txt: _process_telegram_message(tg_handler, task_queue, cid, txt),
+                ),
                 daemon=True,
             )
             poll_thread.start()
@@ -391,7 +409,9 @@ def start_server(host: str = "0.0.0.0", port: int = 5000, poll_telegram: bool = 
             console.print(f"     Webhook URL: [dim]http://<your-domain>:{port}/webhook/telegram[/]")
             console.print("     [dim](Tip: run with --poll to connect without ngrok)[/]")
     else:
-        console.print("  ⚪ Telegram — [dim]not configured (set token with: forge config --set-key telegram <token>)[/]")
+        console.print(
+            "  ⚪ Telegram — [dim]not configured (set token with: forge config --set-key telegram <token>)[/]"
+        )
 
     console.print(f"\n  📡 Android REST API: [bold]http://{host}:{port}/v1[/]")
     console.print("     Endpoints: /health, /v1/pair, /v1/tasks, /v1/approvals")

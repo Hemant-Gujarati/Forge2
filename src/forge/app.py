@@ -1,26 +1,27 @@
 """Main Forge application — interactive REPL with agentic loop and safety approvals."""
 
-import os
-import sys
 import json
+import os
 import platform
-import time
-from pathlib import Path
+import sys
 from datetime import datetime
 
 from prompt_toolkit import prompt as pt_prompt
 from prompt_toolkit.history import FileHistory
 
-from forge.config import Config, SESSIONS_DIR
-from forge.db import init_db, create_task, update_task_status, list_pending_approvals
 from forge.approvals import ApprovalManager
+from forge.config import SESSIONS_DIR, Config
+from forge.db import create_task, init_db, list_pending_approvals, update_task_status
 from forge.providers import create_provider, list_providers
 from forge.providers.base import (
-    BaseProvider, TextDelta, ToolCallEvent, ErrorEvent, DoneEvent,
+    BaseProvider,
+    DoneEvent,
+    ErrorEvent,
+    TextDelta,
+    ToolCallEvent,
 )
 from forge.tools.registry import execute_tool, get_tool_definitions
 from forge.ui import display
-
 
 SYSTEM_PROMPT = """\
 You are Forge, an AI-powered coding assistant running in the terminal.
@@ -96,14 +97,16 @@ class ForgeApp:
 
     def _init_system_prompt(self):
         """Initialize system prompt."""
-        self.messages = [{
-            "role": "system",
-            "content": SYSTEM_PROMPT.format(
-                cwd=os.getcwd(),
-                os_name=platform.system(),
-                time=datetime.now().strftime("%Y-%m-%d %H:%M"),
-            ),
-        }]
+        self.messages = [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT.format(
+                    cwd=os.getcwd(),
+                    os_name=platform.system(),
+                    time=datetime.now().strftime("%Y-%m-%d %H:%M"),
+                ),
+            }
+        ]
 
     def _handle_slash_command(self, command: str) -> bool:
         """Handle a slash command. Returns True if handled."""
@@ -125,15 +128,21 @@ class ForgeApp:
                     self.config.safe_mode = True
                     self.config.save()
                     self.approval_mgr.safe_mode = True
-                    display.print_info("Safe Mode enabled: Destructive actions require your approval.")
+                    display.print_info(
+                        "Safe Mode enabled: Destructive actions require your approval."
+                    )
                 elif arg.lower() in ("off", "false", "0", "disable"):
                     self.config.safe_mode = False
                     self.config.save()
                     self.approval_mgr.safe_mode = False
-                    display.print_warning("Safe Mode disabled: Actions execute automatically without confirmation.")
+                    display.print_warning(
+                        "Safe Mode disabled: Actions execute automatically without confirmation."
+                    )
                 else:
                     status = "ON" if self.config.safe_mode else "OFF"
-                    display.print_info(f"Safe Mode is currently: {status}. Use '/safe on' or '/safe off' to toggle.")
+                    display.print_info(
+                        f"Safe Mode is currently: {status}. Use '/safe on' or '/safe off' to toggle."
+                    )
 
             case "/approvals":
                 pending = list_pending_approvals()
@@ -142,7 +151,9 @@ class ForgeApp:
                 else:
                     display.print_info(f"{len(pending)} pending approval request(s):")
                     for a in pending:
-                        display.console.print(f"  [bold yellow]{a['id']}[/] — {a['action_summary']} ({a['created_at']})")
+                        display.console.print(
+                            f"  [bold yellow]{a['id']}[/] — {a['action_summary']} ({a['created_at']})"
+                        )
 
             case "/clear":
                 self._init_system_prompt()
@@ -162,7 +173,9 @@ class ForgeApp:
                     display.print_info(f"Available: {', '.join(list_providers())}")
                 else:
                     if arg not in list_providers():
-                        display.print_error(f"Unknown provider: {arg}. Available: {', '.join(list_providers())}")
+                        display.print_error(
+                            f"Unknown provider: {arg}. Available: {', '.join(list_providers())}"
+                        )
                     else:
                         self.provider.close()
                         self.provider_name = arg
@@ -175,6 +188,7 @@ class ForgeApp:
 
             case "/config":
                 import copy
+
                 safe = copy.deepcopy(self.config.data)
                 for prov in safe.get("providers", {}).values():
                     if prov.get("api_key"):
@@ -280,7 +294,9 @@ class ForgeApp:
         """Run the agentic loop — chat with AI, prompt for approvals on dangerous tools, execute, repeat."""
         max_iterations = 30
         iteration = 0
-        task_id = create_task(prompt=user_prompt, provider=self.provider_name, model=self.provider.model)
+        task_id = create_task(
+            prompt=user_prompt, provider=self.provider_name, model=self.provider.model
+        )
         update_task_status(task_id, "running")
 
         final_result = ""
@@ -355,12 +371,14 @@ class ForgeApp:
                     is_error = result.startswith("Error")
                     display.print_tool_result(tc.name, result, is_error=is_error)
 
-                self.messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": tc.name,
-                    "content": result,
-                })
+                self.messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "name": tc.name,
+                        "content": result,
+                    }
+                )
 
         if iteration >= max_iterations:
             display.print_warning("Maximum tool iterations reached.")
@@ -370,7 +388,9 @@ class ForgeApp:
     def run(self):
         """Start the interactive REPL."""
         display.print_banner()
-        display.print_status(self.provider_name, self.provider.model, safe_mode=self.config.safe_mode)
+        display.print_status(
+            self.provider_name, self.provider.model, safe_mode=self.config.safe_mode
+        )
 
         while True:
             try:

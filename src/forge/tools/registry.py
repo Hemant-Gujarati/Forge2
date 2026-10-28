@@ -1,13 +1,18 @@
 """Tool definitions and dispatch registry for Forge."""
 
 from typing import Callable
-from forge.tools.file_tools import (
-    read_file, write_file, edit_file, delete_file,
-    list_directory, find_files, search_text,
-)
-from forge.tools.shell_tools import run_command
-from forge.tools.git_tools import git_status, git_diff, git_commit, git_log
 
+from forge.tools.file_tools import (
+    delete_file,
+    edit_file,
+    find_files,
+    list_directory,
+    read_file,
+    search_text,
+    write_file,
+)
+from forge.tools.git_tools import git_commit, git_diff, git_log, git_status
+from forge.tools.shell_tools import run_command
 
 TOOL_DEFINITIONS: list[dict] = [
     {
@@ -16,7 +21,10 @@ TOOL_DEFINITIONS: list[dict] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Absolute or relative path to the file to read"}
+                "path": {
+                    "type": "string",
+                    "description": "Absolute or relative path to the file to read",
+                }
             },
             "required": ["path"],
         },
@@ -27,8 +35,14 @@ TOOL_DEFINITIONS: list[dict] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Path where the file should be created or overwritten"},
-                "content": {"type": "string", "description": "The full content to write to the file"},
+                "path": {
+                    "type": "string",
+                    "description": "Path where the file should be created or overwritten",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The full content to write to the file",
+                },
             },
             "required": ["path", "content"],
         },
@@ -40,7 +54,10 @@ TOOL_DEFINITIONS: list[dict] = [
             "type": "object",
             "properties": {
                 "path": {"type": "string", "description": "Path to the file to edit"},
-                "old_text": {"type": "string", "description": "The exact text to find (must match exactly including whitespace)"},
+                "old_text": {
+                    "type": "string",
+                    "description": "The exact text to find (must match exactly including whitespace)",
+                },
                 "new_text": {"type": "string", "description": "The replacement text"},
             },
             "required": ["path", "old_text", "new_text"],
@@ -63,7 +80,10 @@ TOOL_DEFINITIONS: list[dict] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Directory path. Defaults to current directory."}
+                "path": {
+                    "type": "string",
+                    "description": "Directory path. Defaults to current directory.",
+                }
             },
             "required": [],
         },
@@ -74,8 +94,14 @@ TOOL_DEFINITIONS: list[dict] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Glob pattern (e.g. '*.py', '**/*.js', 'src/**/*.ts')"},
-                "path": {"type": "string", "description": "Directory to search in. Defaults to current directory."},
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern (e.g. '*.py', '**/*.js', 'src/**/*.ts')",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Directory to search in. Defaults to current directory.",
+                },
             },
             "required": ["pattern"],
         },
@@ -87,8 +113,14 @@ TOOL_DEFINITIONS: list[dict] = [
             "type": "object",
             "properties": {
                 "pattern": {"type": "string", "description": "Text or regex pattern to search for"},
-                "path": {"type": "string", "description": "Directory to search in. Defaults to current directory."},
-                "file_pattern": {"type": "string", "description": "Glob pattern to filter files (e.g. '*.py'). Defaults to all files."},
+                "path": {
+                    "type": "string",
+                    "description": "Directory to search in. Defaults to current directory.",
+                },
+                "file_pattern": {
+                    "type": "string",
+                    "description": "Glob pattern to filter files (e.g. '*.py'). Defaults to all files.",
+                },
             },
             "required": ["pattern"],
         },
@@ -116,7 +148,10 @@ TOOL_DEFINITIONS: list[dict] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "staged": {"type": "boolean", "description": "If true, show staged changes. Default false."},
+                "staged": {
+                    "type": "boolean",
+                    "description": "If true, show staged changes. Default false.",
+                },
                 "file": {"type": "string", "description": "Optional specific file to diff."},
             },
             "required": [],
@@ -127,9 +162,7 @@ TOOL_DEFINITIONS: list[dict] = [
         "description": "Stage all changes and create a git commit with the given message.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "message": {"type": "string", "description": "The commit message"}
-            },
+            "properties": {"message": {"type": "string", "description": "The commit message"}},
             "required": ["message"],
         },
     },
@@ -139,7 +172,10 @@ TOOL_DEFINITIONS: list[dict] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "count": {"type": "integer", "description": "Number of commits to show. Default 10."}
+                "count": {
+                    "type": "integer",
+                    "description": "Number of commits to show. Default 10.",
+                }
             },
             "required": [],
         },

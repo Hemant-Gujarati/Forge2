@@ -39,3 +39,7 @@ addopts = "-v --strict-markers"
 line-length = 100
 target-version = "py310"
 exclude = [".git", "__pycache__", "build", "dist", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

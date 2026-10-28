@@ -1,8 +1,7 @@
 """Shell command execution tools for Forge."""
 
-import subprocess
 import os
-import platform
+import subprocess
 
 
 def run_command(command: str, timeout: int = 60) -> str:

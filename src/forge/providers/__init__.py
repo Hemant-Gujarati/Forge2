@@ -10,20 +10,23 @@ def create_provider(name: str, config) -> BaseProvider:
     match name:
         case "openai":
             from forge.providers.openai_provider import OpenAIProvider
+
             return OpenAIProvider(provider_config)
         case "anthropic":
             from forge.providers.anthropic_provider import AnthropicProvider
+
             return AnthropicProvider(provider_config)
         case "gemini":
             from forge.providers.gemini_provider import GeminiProvider
+
             return GeminiProvider(provider_config)
         case "ollama":
             from forge.providers.ollama_provider import OllamaProvider
+
             return OllamaProvider(provider_config)
         case _:
             raise ValueError(
-                f"Unknown provider: '{name}'. "
-                f"Available: openai, anthropic, gemini, ollama"
+                f"Unknown provider: '{name}'. Available: openai, anthropic, gemini, ollama"
             )
 
 

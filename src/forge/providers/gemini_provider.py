@@ -5,8 +5,14 @@ import uuid
 from typing import Generator
 
 from forge.providers.base import (
-    BaseProvider, StreamEvent, TextDelta, ToolCallEvent,
-    ToolCall, ErrorEvent, DoneEvent, parse_sse_line,
+    BaseProvider,
+    DoneEvent,
+    ErrorEvent,
+    StreamEvent,
+    TextDelta,
+    ToolCall,
+    ToolCallEvent,
+    parse_sse_line,
 )
 
 
@@ -39,22 +45,26 @@ class GeminiProvider(BaseProvider):
             if msg["role"] == "system":
                 system_parts.append(msg["content"])
             elif msg["role"] == "user":
-                contents.append({
-                    "role": "user",
-                    "parts": [{"text": msg["content"]}],
-                })
+                contents.append(
+                    {
+                        "role": "user",
+                        "parts": [{"text": msg["content"]}],
+                    }
+                )
             elif msg["role"] == "assistant":
                 parts = []
                 if msg.get("content"):
                     parts.append({"text": msg["content"]})
                 if msg.get("tool_calls"):
                     for tc in msg["tool_calls"]:
-                        parts.append({
-                            "functionCall": {
-                                "name": tc["name"],
-                                "args": tc["arguments"],
+                        parts.append(
+                            {
+                                "functionCall": {
+                                    "name": tc["name"],
+                                    "args": tc["arguments"],
+                                }
                             }
-                        })
+                        )
                 if parts:
                     contents.append({"role": "model", "parts": parts})
             elif msg["role"] == "tool":
@@ -66,8 +76,10 @@ class GeminiProvider(BaseProvider):
                     }
                 }
                 # Merge consecutive function responses
-                if contents and contents[-1]["role"] == "user" and any(
-                    "functionResponse" in p for p in contents[-1]["parts"]
+                if (
+                    contents
+                    and contents[-1]["role"] == "user"
+                    and any("functionResponse" in p for p in contents[-1]["parts"])
                 ):
                     contents[-1]["parts"].append(part)
                 else:
@@ -100,7 +112,10 @@ class GeminiProvider(BaseProvider):
 
         try:
             with self.client.stream(
-                "POST", url, json=body, params=params,
+                "POST",
+                url,
+                json=body,
+                params=params,
             ) as response:
                 if response.status_code != 200:
                     error_body = response.read().decode()
@@ -132,11 +147,13 @@ class GeminiProvider(BaseProvider):
                             yield TextDelta(part["text"])
                         elif "functionCall" in part:
                             fc = part["functionCall"]
-                            yield ToolCallEvent(ToolCall(
-                                id=f"gemini_{uuid.uuid4().hex[:8]}",
-                                name=fc.get("name", ""),
-                                arguments=fc.get("args", {}),
-                            ))
+                            yield ToolCallEvent(
+                                ToolCall(
+                                    id=f"gemini_{uuid.uuid4().hex[:8]}",
+                                    name=fc.get("name", ""),
+                                    arguments=fc.get("args", {}),
+                                )
+                            )
 
         except Exception as e:
             yield ErrorEvent(f"Gemini request failed: {type(e).__name__}: {e}")

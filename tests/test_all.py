@@ -1,31 +1,35 @@
 """Comprehensive test suite for Forge CLI."""
 
 import os
+import shutil
 import sys
 import tempfile
-import shutil
 from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import unittest
-from forge.config import Config, DEFAULT_CONFIG
-from forge.tools.file_tools import (
-    read_file, write_file, edit_file, delete_file,
-    list_directory, find_files, search_text,
-)
-from forge.tools.shell_tools import run_command
-from forge.tools.git_tools import git_status, git_diff, git_commit, git_log
-from forge.tools.registry import execute_tool, get_tool_definitions, TOOL_FUNCTIONS
-from forge.providers import create_provider, list_providers
-from forge.providers.openai_provider import OpenAIProvider
+
+from forge.config import Config
 from forge.providers.anthropic_provider import AnthropicProvider
 from forge.providers.gemini_provider import GeminiProvider
 from forge.providers.ollama_provider import OllamaProvider
-from forge.server.tasks import TaskQueue, Task
-from forge.server.whatsapp import WhatsAppHandler, TelegramHandler
+from forge.providers.openai_provider import OpenAIProvider
 from forge.server.api import create_app
+from forge.server.whatsapp import TelegramHandler
+from forge.tools.file_tools import (
+    delete_file,
+    edit_file,
+    find_files,
+    list_directory,
+    read_file,
+    search_text,
+    write_file,
+)
+from forge.tools.git_tools import git_status
+from forge.tools.registry import execute_tool, get_tool_definitions
+from forge.tools.shell_tools import run_command
 
 
 class TestFileTools(unittest.TestCase):
@@ -83,7 +87,9 @@ class TestFileTools(unittest.TestCase):
         self.assertIn("a.py", result)
 
     def test_search_text(self):
-        write_file(os.path.join(self.test_dir, "code.py"), "def calculate_magic_value():\n    return 42\n")
+        write_file(
+            os.path.join(self.test_dir, "code.py"), "def calculate_magic_value():\n    return 42\n"
+        )
         result = search_text("magic_value", self.test_dir)
         self.assertIn("calculate_magic_value", result)
         self.assertIn("code.py", result)
@@ -150,9 +156,16 @@ class TestProvidersFormatting(unittest.TestCase):
             {
                 "role": "assistant",
                 "content": "Let me read the file.",
-                "tool_calls": [{"id": "call_1", "name": "read_file", "arguments": {"path": "test.txt"}}],
+                "tool_calls": [
+                    {"id": "call_1", "name": "read_file", "arguments": {"path": "test.txt"}}
+                ],
             },
-            {"role": "tool", "tool_call_id": "call_1", "name": "read_file", "content": "file contents"},
+            {
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "name": "read_file",
+                "content": "file contents",
+            },
         ]
 
     def test_openai_formatting(self):
@@ -223,12 +236,16 @@ class TestServerAndTelegram(unittest.TestCase):
     """Test remote access server and telegram handler."""
 
     def test_telegram_handler(self):
-        handler = TelegramHandler({"server": {"telegram": {"bot_token": "test:token", "allowed_chat_ids": [123]}}})
+        handler = TelegramHandler(
+            {"server": {"telegram": {"bot_token": "test:token", "allowed_chat_ids": [123]}}}
+        )
         self.assertTrue(handler.enabled)
         self.assertTrue(handler.is_allowed(123))
         self.assertFalse(handler.is_allowed(999))
 
-        chat_id, text = handler.parse_incoming({"message": {"chat": {"id": 123}, "text": "build app"}})
+        chat_id, text = handler.parse_incoming(
+            {"message": {"chat": {"id": 123}, "text": "build app"}}
+        )
         self.assertEqual(chat_id, 123)
         self.assertEqual(text, "build app")
 

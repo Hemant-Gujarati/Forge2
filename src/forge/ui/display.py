@@ -1,12 +1,12 @@
 """Rich-based terminal display for Forge CLI."""
 
-import sys
 import json
+import sys
+
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.text import Text
 from rich.table import Table
+from rich.text import Text
 
 console = Console()
 

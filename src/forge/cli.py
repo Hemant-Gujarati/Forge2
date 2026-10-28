@@ -2,7 +2,6 @@
 
 import argparse
 import sys
-import os
 
 # Ensure UTF-8 output on Windows consoles to prevent charmap UnicodeEncodeError
 if sys.platform == "win32":
@@ -34,11 +33,13 @@ Examples:
     # --- Chat command (also the default) ---
     chat_parser = subparsers.add_parser("chat", help="Start interactive chat session")
     chat_parser.add_argument(
-        "-p", "--provider",
+        "-p",
+        "--provider",
         help="AI provider (openai, anthropic, gemini, ollama)",
     )
     chat_parser.add_argument(
-        "-m", "--model",
+        "-m",
+        "--model",
         help="Model name to use",
     )
 
@@ -69,7 +70,8 @@ Examples:
     # --- Models command ---
     models_parser = subparsers.add_parser("models", help="List available models")
     models_parser.add_argument(
-        "-p", "--provider",
+        "-p",
+        "--provider",
         help="Provider to list models for (default: current provider)",
     )
 
@@ -141,6 +143,7 @@ def _handle_serve(args):
         return
 
     from forge.server.api import start_server
+
     start_server(host=args.host, port=args.port, poll_telegram=args.poll)
 
 
@@ -166,7 +169,7 @@ def _handle_models(args):
 def _handle_config(args):
     """Manage configuration."""
     from forge.config import Config
-    from forge.ui.display import print_config, console
+    from forge.ui.display import console, print_config
 
     config = Config()
 
@@ -182,8 +185,11 @@ def _handle_config(args):
 
     if args.set_provider:
         from forge.providers import list_providers
+
         if args.set_provider not in list_providers():
-            print(f"Error: Unknown provider '{args.set_provider}'. Available: {', '.join(list_providers())}")
+            print(
+                f"Error: Unknown provider '{args.set_provider}'. Available: {', '.join(list_providers())}"
+            )
             sys.exit(1)
         config.default_provider = args.set_provider
         config.save()
@@ -192,11 +198,14 @@ def _handle_config(args):
 
     # Default: show config
     import copy
+
     safe = copy.deepcopy(config.data)
     for prov in safe.get("providers", {}).values():
         if prov.get("api_key"):
             key = prov["api_key"]
-            prov["api_key"] = key[:8] + "..." + key[-4:] if len(key) > 12 else ("***" if key else "(not set)")
+            prov["api_key"] = (
+                key[:8] + "..." + key[-4:] if len(key) > 12 else ("***" if key else "(not set)")
+            )
     for section in ("whatsapp", "telegram"):
         sec = safe.get("server", {}).get(section, {})
         for secret_key in ("auth_token", "bot_token", "account_sid"):

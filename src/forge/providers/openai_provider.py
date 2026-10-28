@@ -5,8 +5,14 @@ import uuid
 from typing import Generator
 
 from forge.providers.base import (
-    BaseProvider, StreamEvent, TextDelta, ToolCallEvent,
-    ToolCall, ErrorEvent, DoneEvent, parse_sse_line,
+    BaseProvider,
+    DoneEvent,
+    ErrorEvent,
+    StreamEvent,
+    TextDelta,
+    ToolCall,
+    ToolCallEvent,
+    parse_sse_line,
 )
 
 
@@ -45,22 +51,28 @@ class OpenAIProvider(BaseProvider):
                     }
                     for tc in msg["tool_calls"]
                 ]
-                formatted.append({
-                    "role": "assistant",
-                    "content": msg.get("content") or None,
-                    "tool_calls": tool_calls,
-                })
+                formatted.append(
+                    {
+                        "role": "assistant",
+                        "content": msg.get("content") or None,
+                        "tool_calls": tool_calls,
+                    }
+                )
             elif msg["role"] == "tool":
-                formatted.append({
-                    "role": "tool",
-                    "tool_call_id": msg["tool_call_id"],
-                    "content": msg["content"],
-                })
+                formatted.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": msg["tool_call_id"],
+                        "content": msg["content"],
+                    }
+                )
             else:
-                formatted.append({
-                    "role": msg["role"],
-                    "content": msg["content"],
-                })
+                formatted.append(
+                    {
+                        "role": msg["role"],
+                        "content": msg["content"],
+                    }
+                )
         return formatted
 
     def chat(
@@ -117,7 +129,6 @@ class OpenAIProvider(BaseProvider):
                         continue
 
                     delta = choices[0].get("delta", {})
-                    finish = choices[0].get("finish_reason")
 
                     # Text content
                     if delta.get("content"):
@@ -148,11 +159,13 @@ class OpenAIProvider(BaseProvider):
                         args = json.loads(tc["arguments"]) if tc["arguments"] else {}
                     except json.JSONDecodeError:
                         args = {"_raw": tc["arguments"]}
-                    yield ToolCallEvent(ToolCall(
-                        id=tc["id"],
-                        name=tc["name"],
-                        arguments=args,
-                    ))
+                    yield ToolCallEvent(
+                        ToolCall(
+                            id=tc["id"],
+                            name=tc["name"],
+                            arguments=args,
+                        )
+                    )
 
         except Exception as e:
             yield ErrorEvent(f"OpenAI request failed: {type(e).__name__}: {e}")

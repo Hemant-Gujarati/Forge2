@@ -1,9 +1,10 @@
 """Telegram and WhatsApp message handlers for Forge remote access."""
 
-import time
 import threading
+import time
+from typing import Callable
+
 import httpx
-from typing import Any, Callable
 
 
 def split_telegram_message(text: str, max_length: int = 4000) -> list[str]:

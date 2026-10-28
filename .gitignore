@@ -1,7 +1,42 @@
+# Bytecode & Python artifacts
 __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
 dist/
 build/
+.venv/
+venv/
+ENV/
+
+# Testing & Linting
 .pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local databases & state
+*.db
+*.sqlite
+*.sqlite3
+history.txt
+sessions/
+
+# Sensitive configs & secrets
+.env
+.env.*
+config.yaml
+*.pem
+*.key
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+
+# OS files
+.DS_Store
+Thumbs.db

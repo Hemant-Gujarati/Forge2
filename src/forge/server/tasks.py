@@ -1,29 +1,30 @@
 """Background task queue with SQLite persistence, safety approvals, and cancellation."""
 
-import threading
-import queue
 import os
 import platform
+import queue
+import threading
 import uuid
-import time
-from typing import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Callable
 
-from forge.config import Config
-from forge.db import (
-    init_db, create_task as db_create_task, update_task_status as db_update_task_status,
-    get_task as db_get_task, list_tasks as db_list_tasks
-)
 from forge.approvals import ApprovalManager
+from forge.config import Config
+from forge.db import create_task as db_create_task
+from forge.db import get_task as db_get_task
+from forge.db import init_db
+from forge.db import list_tasks as db_list_tasks
+from forge.db import update_task_status as db_update_task_status
 from forge.providers import create_provider
+from forge.providers.base import DoneEvent, ErrorEvent, TextDelta, ToolCallEvent
 from forge.tools.registry import execute_tool, get_tool_definitions
-from forge.providers.base import TextDelta, ToolCallEvent, DoneEvent, ErrorEvent
 
 
 @dataclass
 class Task:
     """A background task to process."""
+
     id: str
     prompt: str
     callback: Callable[[str], None] | None = None
@@ -60,7 +61,9 @@ class TaskQueue:
         db_create_task(
             prompt=prompt,
             provider=self.config.default_provider,
-            model=self.config.get_provider_config(self.config.default_provider).get("default_model", ""),
+            model=self.config.get_provider_config(self.config.default_provider).get(
+                "default_model", ""
+            ),
             task_id=task_id,
         )
 
@@ -195,8 +198,7 @@ class TaskQueue:
             msg: dict = {"role": "assistant", "content": text_buffer}
             if tool_calls:
                 msg["tool_calls"] = [
-                    {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
-                    for tc in tool_calls
+                    {"id": tc.id, "name": tc.name, "arguments": tc.arguments} for tc in tool_calls
                 ]
             messages.append(msg)
 
@@ -238,12 +240,14 @@ class TaskQueue:
                 else:
                     tool_result = execute_tool(tc.name, tc.arguments)
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": tc.name,
-                    "content": tool_result,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "name": tc.name,
+                        "content": tool_result,
+                    }
+                )
 
         provider.close()
         return last_text or "Task completed."

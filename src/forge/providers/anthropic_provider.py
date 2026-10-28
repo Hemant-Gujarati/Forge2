@@ -5,8 +5,14 @@ import uuid
 from typing import Generator
 
 from forge.providers.base import (
-    BaseProvider, StreamEvent, TextDelta, ToolCallEvent,
-    ToolCall, ErrorEvent, DoneEvent, parse_sse_line,
+    BaseProvider,
+    DoneEvent,
+    ErrorEvent,
+    StreamEvent,
+    TextDelta,
+    ToolCall,
+    ToolCallEvent,
+    parse_sse_line,
 )
 
 
@@ -42,12 +48,14 @@ class AnthropicProvider(BaseProvider):
                     content_blocks.append({"type": "text", "text": msg["content"]})
                 if msg.get("tool_calls"):
                     for tc in msg["tool_calls"]:
-                        content_blocks.append({
-                            "type": "tool_use",
-                            "id": tc["id"],
-                            "name": tc["name"],
-                            "input": tc["arguments"],
-                        })
+                        content_blocks.append(
+                            {
+                                "type": "tool_use",
+                                "id": tc["id"],
+                                "name": tc["name"],
+                                "input": tc["arguments"],
+                            }
+                        )
                 if content_blocks:
                     formatted.append({"role": "assistant", "content": content_blocks})
             elif msg["role"] == "tool":
@@ -58,7 +66,11 @@ class AnthropicProvider(BaseProvider):
                     "content": msg["content"],
                 }
                 # Merge consecutive tool results into one user message
-                if formatted and formatted[-1]["role"] == "user" and isinstance(formatted[-1]["content"], list):
+                if (
+                    formatted
+                    and formatted[-1]["role"] == "user"
+                    and isinstance(formatted[-1]["content"], list)
+                ):
                     formatted[-1]["content"].append(tool_result)
                 else:
                     formatted.append({"role": "user", "content": [tool_result]})
@@ -100,7 +112,9 @@ class AnthropicProvider(BaseProvider):
             ) as response:
                 if response.status_code != 200:
                     error_body = response.read().decode()
-                    yield ErrorEvent(f"Anthropic API error {response.status_code}: {error_body[:500]}")
+                    yield ErrorEvent(
+                        f"Anthropic API error {response.status_code}: {error_body[:500]}"
+                    )
                     yield DoneEvent()
                     return
 
@@ -150,11 +164,13 @@ class AnthropicProvider(BaseProvider):
                                 args = json.loads(current_tool_json) if current_tool_json else {}
                             except json.JSONDecodeError:
                                 args = {"_raw": current_tool_json}
-                            yield ToolCallEvent(ToolCall(
-                                id=current_tool_id,
-                                name=current_tool_name,
-                                arguments=args,
-                            ))
+                            yield ToolCallEvent(
+                                ToolCall(
+                                    id=current_tool_id,
+                                    name=current_tool_name,
+                                    arguments=args,
+                                )
+                            )
                         current_block_type = None
 
                     elif event_type == "message_stop":

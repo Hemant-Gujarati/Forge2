@@ -1,18 +1,25 @@
 """Tests for Phase 2, 3, 4, and 5: SQLite, approvals, Android API, and Telegram bot."""
 
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
 import unittest
+from pathlib import Path
 
+from forge.approvals import is_destructive_action
 from forge.db import (
-    init_db, create_task, update_task_status, get_task, list_tasks,
-    create_approval, get_approval, list_pending_approvals, update_approval_status,
-    create_pairing_token, verify_pairing_token
+    create_approval,
+    create_pairing_token,
+    create_task,
+    get_approval,
+    get_task,
+    init_db,
+    list_pending_approvals,
+    list_tasks,
+    update_approval_status,
+    update_task_status,
+    verify_pairing_token,
 )
-from forge.approvals import ApprovalManager, is_destructive_action, format_action_summary
 from forge.server.api import create_app
-from forge.server.tasks import TaskQueue
 from forge.server.whatsapp import split_telegram_message
 
 
@@ -28,7 +35,9 @@ class TestDatabaseAndApprovals(unittest.TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_task_crud(self):
-        tid = create_task(prompt="Refactor login", provider="ollama", model="llama3.2", db_path=self.db_path)
+        tid = create_task(
+            prompt="Refactor login", provider="ollama", model="llama3.2", db_path=self.db_path
+        )
         t = get_task(tid, db_path=self.db_path)
         self.assertIsNotNone(t)
         self.assertEqual(t["status"], "pending")

@@ -7,8 +7,13 @@ from typing import Generator
 import httpx
 
 from forge.providers.base import (
-    BaseProvider, StreamEvent, TextDelta, ToolCallEvent,
-    ToolCall, ErrorEvent, DoneEvent,
+    BaseProvider,
+    DoneEvent,
+    ErrorEvent,
+    StreamEvent,
+    TextDelta,
+    ToolCall,
+    ToolCallEvent,
 )
 
 
@@ -43,27 +48,35 @@ class OllamaProvider(BaseProvider):
             if msg["role"] == "assistant" and msg.get("tool_calls"):
                 tool_calls = []
                 for tc in msg["tool_calls"]:
-                    tool_calls.append({
-                        "function": {
-                            "name": tc["name"],
-                            "arguments": tc["arguments"],
+                    tool_calls.append(
+                        {
+                            "function": {
+                                "name": tc["name"],
+                                "arguments": tc["arguments"],
+                            }
                         }
-                    })
-                formatted.append({
-                    "role": "assistant",
-                    "content": msg.get("content", ""),
-                    "tool_calls": tool_calls,
-                })
+                    )
+                formatted.append(
+                    {
+                        "role": "assistant",
+                        "content": msg.get("content", ""),
+                        "tool_calls": tool_calls,
+                    }
+                )
             elif msg["role"] == "tool":
-                formatted.append({
-                    "role": "tool",
-                    "content": msg["content"],
-                })
+                formatted.append(
+                    {
+                        "role": "tool",
+                        "content": msg["content"],
+                    }
+                )
             else:
-                formatted.append({
-                    "role": msg["role"],
-                    "content": msg["content"],
-                })
+                formatted.append(
+                    {
+                        "role": msg["role"],
+                        "content": msg["content"],
+                    }
+                )
         return formatted
 
     def chat(
@@ -117,11 +130,13 @@ class OllamaProvider(BaseProvider):
                                     args = json.loads(args)
                                 except json.JSONDecodeError:
                                     args = {"_raw": args}
-                            yield ToolCallEvent(ToolCall(
-                                id=f"ollama_{uuid.uuid4().hex[:8]}",
-                                name=func.get("name", ""),
-                                arguments=args,
-                            ))
+                            yield ToolCallEvent(
+                                ToolCall(
+                                    id=f"ollama_{uuid.uuid4().hex[:8]}",
+                                    name=func.get("name", ""),
+                                    arguments=args,
+                                )
+                            )
 
                     if chunk.get("done", False):
                         break
@@ -144,7 +159,11 @@ class OllamaProvider(BaseProvider):
             if resp.status_code == 200:
                 data = resp.json()
                 models = [m["name"] for m in data.get("models", [])]
-                return sorted(models) if models else ["(no models installed — run: ollama pull llama3.2)"]
+                return (
+                    sorted(models)
+                    if models
+                    else ["(no models installed — run: ollama pull llama3.2)"]
+                )
             return [f"(Error: {resp.status_code})"]
         except httpx.ConnectError:
             return ["(Ollama not running — start with: ollama serve)"]

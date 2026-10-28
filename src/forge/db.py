@@ -1,11 +1,12 @@
 """SQLite storage for tasks, approvals, and pairing tokens."""
 
-import sqlite3
 import json
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
 from forge.config import DB_PATH
 
 
@@ -63,6 +64,7 @@ def init_db(db_path: Path | None = None):
 
 # --- Task Operations ---
 
+
 def create_task(
     prompt: str,
     provider: str = "",
@@ -93,7 +95,9 @@ def update_task_status(
     db_path: Path | None = None,
 ):
     """Update status and result of a task."""
-    now = datetime.now(timezone.utc).isoformat() if status in ("done", "error", "cancelled") else None
+    now = (
+        datetime.now(timezone.utc).isoformat() if status in ("done", "error", "cancelled") else None
+    )
     conn = _get_connection(db_path)
     with conn:
         if now:
@@ -129,15 +133,14 @@ def get_task(task_id: str, db_path: Path | None = None) -> dict[str, Any] | None
 def list_tasks(limit: int = 50, db_path: Path | None = None) -> list[dict[str, Any]]:
     """List recent tasks."""
     conn = _get_connection(db_path)
-    cur = conn.execute(
-        "SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)
-    )
+    cur = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,))
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
 # --- Approval Operations ---
+
 
 def create_approval(
     action_type: str,
@@ -179,9 +182,7 @@ def get_approval(approval_id: str, db_path: Path | None = None) -> dict[str, Any
 def list_pending_approvals(db_path: Path | None = None) -> list[dict[str, Any]]:
     """List all pending approval requests."""
     conn = _get_connection(db_path)
-    cur = conn.execute(
-        "SELECT * FROM approvals WHERE status = 'pending' ORDER BY created_at ASC"
-    )
+    cur = conn.execute("SELECT * FROM approvals WHERE status = 'pending' ORDER BY created_at ASC")
     rows = cur.fetchall()
     conn.close()
     results = []
@@ -195,9 +196,7 @@ def list_pending_approvals(db_path: Path | None = None) -> list[dict[str, Any]]:
 def list_approvals(limit: int = 50, db_path: Path | None = None) -> list[dict[str, Any]]:
     """List recent approvals."""
     conn = _get_connection(db_path)
-    cur = conn.execute(
-        "SELECT * FROM approvals ORDER BY created_at DESC LIMIT ?", (limit,)
-    )
+    cur = conn.execute("SELECT * FROM approvals ORDER BY created_at DESC LIMIT ?", (limit,))
     rows = cur.fetchall()
     conn.close()
     results = []
@@ -230,6 +229,7 @@ def update_approval_status(
 
 
 # --- Pairing Token Operations ---
+
 
 def create_pairing_token(client_name: str = "Android Device", db_path: Path | None = None) -> str:
     """Generate a new pairing token for remote clients."""
@@ -277,9 +277,7 @@ def revoke_pairing_token(token: str, db_path: Path | None = None) -> bool:
     """Revoke a pairing token."""
     conn = _get_connection(db_path)
     with conn:
-        cur = conn.execute(
-            "UPDATE pairing_tokens SET revoked = 1 WHERE token = ?", (token,)
-        )
+        cur = conn.execute("UPDATE pairing_tokens SET revoked = 1 WHERE token = ?", (token,))
         revoked = cur.rowcount > 0
     conn.close()
     return revoked
