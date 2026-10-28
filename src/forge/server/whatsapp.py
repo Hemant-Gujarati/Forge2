@@ -1,4 +1,4 @@
-"""WhatsApp and Telegram message handlers for Forge remote access."""
+"""Telegram and WhatsApp message handlers for Forge remote access."""
 
 import time
 import threading
@@ -6,63 +6,37 @@ import httpx
 from typing import Any, Callable
 
 
-class WhatsAppHandler:
-    """Handle WhatsApp messages via Twilio API (no SDK needed)."""
+def split_telegram_message(text: str, max_length: int = 4000) -> list[str]:
+    """Split a long text into chunks that respect Telegram's 4096 character limit."""
+    if len(text) <= max_length:
+        return [text]
 
-    def __init__(self, config: dict):
-        wa_config = config.get("server", {}).get("whatsapp", {})
-        self.account_sid = wa_config.get("account_sid", "")
-        self.auth_token = wa_config.get("auth_token", "")
-        self.from_number = wa_config.get("from_number", "")
-        self.allowed_numbers = set(wa_config.get("allowed_numbers", []))
-        self.enabled = bool(self.account_sid and self.auth_token and self.from_number)
+    chunks = []
+    remaining = text
 
-    def is_allowed(self, from_number: str) -> bool:
-        """Check if a number is allowed to send commands."""
-        if not self.allowed_numbers:
-            return True  # If no restrictions, allow all
-        return from_number in self.allowed_numbers
+    while len(remaining) > max_length:
+        # Try to find a paragraph break
+        split_pos = remaining.rfind("\n\n", 0, max_length)
+        if split_pos == -1 or split_pos < max_length // 2:
+            # Try a line break
+            split_pos = remaining.rfind("\n", 0, max_length)
+        if split_pos == -1 or split_pos < max_length // 2:
+            # Try a space
+            split_pos = remaining.rfind(" ", 0, max_length)
+        if split_pos == -1:
+            split_pos = max_length
 
-    def send_message(self, to_number: str, body: str):
-        """Send a WhatsApp message via Twilio REST API."""
-        if not self.enabled:
-            return
+        chunks.append(remaining[:split_pos].strip())
+        remaining = remaining[split_pos:].strip()
 
-        # Truncate long messages (WhatsApp limit is ~4096 chars)
-        if len(body) > 4000:
-            body = body[:3900] + "\n\n... (truncated)"
+    if remaining:
+        chunks.append(remaining)
 
-        url = (
-            f"https://api.twilio.com/2010-04-01"
-            f"/Accounts/{self.account_sid}/Messages.json"
-        )
-
-        try:
-            with httpx.Client(timeout=30) as client:
-                resp = client.post(
-                    url,
-                    auth=(self.account_sid, self.auth_token),
-                    data={
-                        "Body": body,
-                        "From": self.from_number,
-                        "To": to_number,
-                    },
-                )
-                if resp.status_code not in (200, 201):
-                    print(f"[Forge] WhatsApp send error: {resp.status_code} {resp.text[:200]}")
-        except Exception as e:
-            print(f"[Forge] WhatsApp send failed: {e}")
-
-    def parse_incoming(self, form_data: dict) -> tuple[str, str]:
-        """Parse incoming Twilio webhook data. Returns (from_number, message_body)."""
-        return (
-            form_data.get("From", ""),
-            form_data.get("Body", "").strip(),
-        )
+    return chunks
 
 
 class TelegramHandler:
-    """Handle Telegram messages via Bot API (no SDK needed)."""
+    """Handle Telegram messages via Bot API with long-polling (no ngrok required)."""
 
     def __init__(self, config: dict):
         tg_config = config.get("server", {}).get("telegram", {})
@@ -78,35 +52,34 @@ class TelegramHandler:
         return chat_id in self.allowed_chat_ids
 
     def send_message(self, chat_id: int, text: str):
-        """Send a Telegram message."""
-        if not self.enabled:
+        """Send a Telegram message, splitting long messages if necessary."""
+        if not self.enabled or not text:
             return
 
-        # Telegram message limit is 4096 chars
-        if len(text) > 4000:
-            text = text[:3900] + "\n\n... (truncated)"
+        chunks = split_telegram_message(text)
 
-        try:
-            with httpx.Client(timeout=30) as client:
-                resp = client.post(
-                    f"{self.api_base}/sendMessage",
-                    json={
-                        "chat_id": chat_id,
-                        "text": text,
-                        "parse_mode": "Markdown",
-                    },
-                )
-                if resp.status_code != 200:
-                    # Retry without markdown if formatting fails
-                    client.post(
+        for chunk in chunks:
+            try:
+                with httpx.Client(timeout=30) as client:
+                    resp = client.post(
                         f"{self.api_base}/sendMessage",
-                        json={"chat_id": chat_id, "text": text},
+                        json={
+                            "chat_id": chat_id,
+                            "text": chunk,
+                            "parse_mode": "Markdown",
+                        },
                     )
-        except Exception as e:
-            print(f"[Forge] Telegram send failed: {e}")
+                    if resp.status_code != 200:
+                        # Fallback to plain text if Markdown parsing fails
+                        client.post(
+                            f"{self.api_base}/sendMessage",
+                            json={"chat_id": chat_id, "text": chunk},
+                        )
+            except Exception as e:
+                print(f"[Forge] Telegram send failed: {e}")
 
     def parse_incoming(self, data: dict) -> tuple[int, str]:
-        """Parse incoming Telegram webhook or update. Returns (chat_id, message_text)."""
+        """Parse incoming Telegram update. Returns (chat_id, message_text)."""
         msg = data.get("message") or data.get("edited_message") or {}
         chat_id = msg.get("chat", {}).get("id", 0)
         text = msg.get("text", "").strip()
@@ -138,7 +111,7 @@ class TelegramHandler:
         on_message: Callable[[int, str], None],
         stop_event: threading.Event | None = None,
     ):
-        """Long poll updates from Telegram (no public URL or ngrok required)."""
+        """Long poll updates from Telegram (completely free, no public URL/ngrok required)."""
         if not self.enabled:
             return
 
@@ -164,3 +137,45 @@ class TelegramHandler:
                         time.sleep(3)
             except Exception:
                 time.sleep(2)
+
+
+class WhatsAppHandler:
+    """Handle WhatsApp messages via Twilio API."""
+
+    def __init__(self, config: dict):
+        wa_config = config.get("server", {}).get("whatsapp", {})
+        self.account_sid = wa_config.get("account_sid", "")
+        self.auth_token = wa_config.get("auth_token", "")
+        self.from_number = wa_config.get("from_number", "")
+        self.allowed_numbers = set(wa_config.get("allowed_numbers", []))
+        self.enabled = bool(self.account_sid and self.auth_token and self.from_number)
+
+    def is_allowed(self, from_number: str) -> bool:
+        """Check if a number is allowed to send commands."""
+        if not self.allowed_numbers:
+            return True
+        return from_number in self.allowed_numbers
+
+    def send_message(self, to_number: str, body: str):
+        """Send a WhatsApp message via Twilio REST API."""
+        if not self.enabled:
+            return
+
+        if len(body) > 4000:
+            body = body[:3900] + "\n\n... (truncated)"
+
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{self.account_sid}/Messages.json"
+
+        try:
+            with httpx.Client(timeout=30) as client:
+                client.post(
+                    url,
+                    auth=(self.account_sid, self.auth_token),
+                    data={"Body": body, "From": self.from_number, "To": to_number},
+                )
+        except Exception as e:
+            print(f"[Forge] WhatsApp send failed: {e}")
+
+    def parse_incoming(self, form_data: dict) -> tuple[str, str]:
+        """Parse incoming Twilio webhook data."""
+        return form_data.get("From", ""), form_data.get("Body", "").strip()

@@ -1,4 +1,4 @@
-"""Main Forge application — interactive REPL with agentic loop."""
+"""Main Forge application — interactive REPL with agentic loop and safety approvals."""
 
 import os
 import sys
@@ -12,6 +12,8 @@ from prompt_toolkit import prompt as pt_prompt
 from prompt_toolkit.history import FileHistory
 
 from forge.config import Config, SESSIONS_DIR
+from forge.db import init_db, create_task, update_task_status, list_pending_approvals
+from forge.approvals import ApprovalManager
 from forge.providers import create_provider, list_providers
 from forge.providers.base import (
     BaseProvider, TextDelta, ToolCallEvent, ErrorEvent, DoneEvent,
@@ -28,27 +30,27 @@ You help users with coding tasks by reading, writing, and editing files, and by 
 ## Available Tools
 
 You have these tools:
-- **read_file**: Read file contents to understand code
-- **write_file**: Create new files or overwrite existing ones (parent dirs created automatically)
-- **edit_file**: Make targeted edits by finding and replacing exact text
-- **delete_file**: Delete files or empty directories
-- **list_directory**: List directory contents
-- **find_files**: Find files by glob pattern (e.g. *.py, **/*.js)
-- **search_text**: Search for text/regex across files (like grep)
-- **run_command**: Execute shell commands
-- **git_status**: Show git status
-- **git_diff**: Show code changes
-- **git_commit**: Stage all and commit
-- **git_log**: Show commit history
+- **read_file**: Read file contents to understand code (Read-only, runs immediately)
+- **write_file**: Create new files or overwrite existing ones (Modifies files, requires approval in Safe Mode)
+- **edit_file**: Make targeted edits by finding and replacing exact text (Modifies files, requires approval in Safe Mode)
+- **delete_file**: Delete files or empty directories (Requires approval in Safe Mode)
+- **list_directory**: List directory contents (Read-only)
+- **find_files**: Find files by glob pattern (Read-only)
+- **search_text**: Search for text/regex across files (Read-only)
+- **run_command**: Execute shell commands (Requires approval in Safe Mode)
+- **git_status**: Show git status (Read-only)
+- **git_diff**: Show code changes (Read-only)
+- **git_commit**: Stage all and commit (Requires approval in Safe Mode)
+- **git_log**: Show commit history (Read-only)
 
 ## Guidelines
 
 1. When asked to work on code, read relevant files first to understand context
-2. Use tools proactively — make changes directly, don't just suggest them
+2. Propose necessary changes clearly — explain what you are about to do before doing it
 3. After creating/editing files, briefly confirm what you did
 4. When creating new projects, set up proper structure with all needed files
 5. For complex tasks, break them into steps and execute each one
-6. Handle errors gracefully — if something fails, try to fix it
+6. Handle errors gracefully — if an action is rejected by the user, acknowledge it and suggest alternatives
 7. Be concise but clear in explanations
 
 Working directory: {cwd}
@@ -65,6 +67,7 @@ class ForgeApp:
         provider_name: str | None = None,
         model: str | None = None,
     ):
+        init_db()
         self.config = Config()
         self.provider_name = provider_name or self.config.default_provider
         self.provider: BaseProvider = self._create_provider()
@@ -72,6 +75,9 @@ class ForgeApp:
             self.provider.set_model(model)
         self.messages: list[dict] = []
         self._init_system_prompt()
+
+        # Approval manager
+        self.approval_mgr = ApprovalManager(safe_mode=self.config.safe_mode)
 
         # Setup input history
         history_file = self.config.config_path.parent / "history.txt"
@@ -114,6 +120,30 @@ class ForgeApp:
                 self.provider.close()
                 sys.exit(0)
 
+            case "/safe":
+                if arg.lower() in ("on", "true", "1", "enable"):
+                    self.config.safe_mode = True
+                    self.config.save()
+                    self.approval_mgr.safe_mode = True
+                    display.print_info("Safe Mode enabled: Destructive actions require your approval.")
+                elif arg.lower() in ("off", "false", "0", "disable"):
+                    self.config.safe_mode = False
+                    self.config.save()
+                    self.approval_mgr.safe_mode = False
+                    display.print_warning("Safe Mode disabled: Actions execute automatically without confirmation.")
+                else:
+                    status = "ON" if self.config.safe_mode else "OFF"
+                    display.print_info(f"Safe Mode is currently: {status}. Use '/safe on' or '/safe off' to toggle.")
+
+            case "/approvals":
+                pending = list_pending_approvals()
+                if not pending:
+                    display.print_info("No pending approval requests.")
+                else:
+                    display.print_info(f"{len(pending)} pending approval request(s):")
+                    for a in pending:
+                        display.console.print(f"  [bold yellow]{a['id']}[/] — {a['action_summary']} ({a['created_at']})")
+
             case "/clear":
                 self._init_system_prompt()
                 display.print_info("Conversation cleared.")
@@ -144,7 +174,6 @@ class ForgeApp:
                 display.print_models(self.provider_name, models, self.provider.model)
 
             case "/config":
-                # Redact API keys for display
                 import copy
                 safe = copy.deepcopy(self.config.data)
                 for prov in safe.get("providers", {}).values():
@@ -160,7 +189,6 @@ class ForgeApp:
                     try:
                         os.chdir(arg)
                         display.print_info(f"Changed to: {os.getcwd()}")
-                        # Update system prompt with new cwd
                         self._init_system_prompt()
                     except FileNotFoundError:
                         display.print_error(f"Directory not found: {arg}")
@@ -202,7 +230,6 @@ class ForgeApp:
         """Load a session from disk."""
         path = SESSIONS_DIR / f"{name}.json"
         if not path.exists():
-            # Try without .json
             path = SESSIONS_DIR / name
             if not path.exists():
                 display.print_error(f"Session not found: {name}")
@@ -213,7 +240,6 @@ class ForgeApp:
                 data = json.load(f)
             self.messages = data["messages"]
 
-            # Switch provider/model if different
             if data.get("provider") and data["provider"] != self.provider_name:
                 self.provider.close()
                 self.provider_name = data["provider"]
@@ -250,10 +276,14 @@ class ForgeApp:
                 display.console.print(f"  [bold]{name}[/]")
         display.print_info("Usage: /load <session_name>")
 
-    def _agentic_loop(self):
-        """Run the agentic loop — chat with AI, execute tools, repeat."""
-        max_iterations = 30  # Safety limit
+    def _agentic_loop(self, user_prompt: str = ""):
+        """Run the agentic loop — chat with AI, prompt for approvals on dangerous tools, execute, repeat."""
+        max_iterations = 30
         iteration = 0
+        task_id = create_task(prompt=user_prompt, provider=self.provider_name, model=self.provider.model)
+        update_task_status(task_id, "running")
+
+        final_result = ""
 
         while iteration < max_iterations:
             iteration += 1
@@ -274,16 +304,19 @@ class ForgeApp:
                         display.end_stream()
                         display.print_error(event.message)
                         had_error = True
+                        final_result = f"Error: {event.message}"
                         break
                     elif isinstance(event, DoneEvent):
                         break
             except KeyboardInterrupt:
                 display.end_stream()
                 display.print_warning("Response interrupted.")
+                final_result = "Interrupted by user"
                 break
 
             if text_buffer:
                 display.end_stream()
+                final_result = text_buffer
 
             if had_error:
                 break
@@ -302,12 +335,25 @@ class ForgeApp:
             if not tool_calls:
                 break
 
-            # Execute each tool call
+            # Execute each tool call with approval check
             for tc in tool_calls:
                 display.print_tool_call(tc.name, tc.arguments)
-                result = execute_tool(tc.name, tc.arguments)
-                is_error = result.startswith("Error")
-                display.print_tool_result(tc.name, result, is_error=is_error)
+
+                # Safety check
+                approved, reason = self.approval_mgr.request_approval(
+                    tool_name=tc.name,
+                    arguments=tc.arguments,
+                    task_id=task_id,
+                    interactive_prompt=display.prompt_approval_cli,
+                )
+
+                if not approved:
+                    result = f"Error: Action not approved by user. ({reason})"
+                    display.print_tool_result(tc.name, result, is_error=True)
+                else:
+                    result = execute_tool(tc.name, tc.arguments)
+                    is_error = result.startswith("Error")
+                    display.print_tool_result(tc.name, result, is_error=is_error)
 
                 self.messages.append({
                     "role": "tool",
@@ -316,15 +362,15 @@ class ForgeApp:
                     "content": result,
                 })
 
-            # Continue loop — AI will process tool results
-
         if iteration >= max_iterations:
             display.print_warning("Maximum tool iterations reached.")
+
+        update_task_status(task_id, "done", result=final_result)
 
     def run(self):
         """Start the interactive REPL."""
         display.print_banner()
-        display.print_status(self.provider_name, self.provider.model)
+        display.print_status(self.provider_name, self.provider.model, safe_mode=self.config.safe_mode)
 
         while True:
             try:
@@ -343,13 +389,9 @@ class ForgeApp:
             if not user_input:
                 continue
 
-            # Handle slash commands
             if user_input.startswith("/"):
                 self._handle_slash_command(user_input)
                 continue
 
-            # Add user message
             self.messages.append({"role": "user", "content": user_input})
-
-            # Run the agentic loop
-            self._agentic_loop()
+            self._agentic_loop(user_prompt=user_input)

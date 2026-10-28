@@ -30,10 +30,11 @@ def print_banner():
     console.print(panel)
 
 
-def print_status(provider: str, model: str):
-    """Display current provider and model."""
+def print_status(provider: str, model: str, safe_mode: bool = True):
+    """Display current provider, model, and safe mode status."""
+    safe_badge = "[bold green]Safe Mode: ON[/]" if safe_mode else "[bold yellow]Safe Mode: OFF[/]"
     console.print(
-        f"   Provider: [bold green]{provider}[/] │ Model: [bold green]{model}[/]",
+        f"   Provider: [bold green]{provider}[/] │ Model: [bold green]{model}[/] │ {safe_badge}",
         style="dim",
     )
     console.print()
@@ -76,6 +77,36 @@ def print_tool_result(name: str, result: str, is_error: bool = False):
     console.print(panel)
 
 
+def prompt_approval_cli(approval_id: str, summary: str, arguments: dict) -> bool:
+    """Prompt user interactively in the terminal to approve or reject a destructive action."""
+    details = json.dumps(arguments, indent=2, ensure_ascii=False)
+    if len(details) > 800:
+        details = details[:800] + "\n..."
+
+    panel_content = f"[bold yellow]{summary}[/]\n\n[dim]{details}[/]\n\n"
+    panel_content += "[bold white]Approve this action? [/][green][y][/]/[red][n][/] "
+
+    panel = Panel(
+        panel_content,
+        title=f"[bold red]⚠️  APPROVAL REQUIRED [{approval_id}][/]",
+        border_style="red",
+        padding=(1, 2),
+    )
+    console.print(panel)
+
+    try:
+        choice = input("Enter [y/n] (default: n): ").strip().lower()
+        if choice in ("y", "yes"):
+            console.print("[bold green]✅ Action Approved[/]\n")
+            return True
+        else:
+            console.print("[bold red]❌ Action Rejected[/]\n")
+            return False
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[bold red]❌ Action Rejected (Interrupted)[/]\n")
+        return False
+
+
 def print_error(message: str):
     """Display an error message."""
     console.print(f"\n❌ [bold red]{message}[/]\n")
@@ -99,8 +130,10 @@ def print_help():
 
     commands = [
         ("/help", "Show this help message"),
+        ("/safe on|off", "Toggle safe mode (require approval for file edits / commands)"),
+        ("/approvals", "List pending approval requests"),
         ("/model <name>", "Switch to a different model"),
-        ("/provider <name>", "Switch provider (openai, anthropic, gemini, ollama)"),
+        ("/provider <name>", "Switch provider (ollama, openai, anthropic, gemini)"),
         ("/models", "List available models for current provider"),
         ("/clear", "Clear conversation history"),
         ("/save [name]", "Save current session"),
@@ -133,7 +166,6 @@ def end_stream():
 def start_assistant_response():
     """Print assistant response prefix."""
     console.print("\n[bold blue]Forge:[/] ", end="")
-    # Switch to raw stdout for streaming
     sys.stdout.flush()
 
 
