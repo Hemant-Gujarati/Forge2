@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "forge-cli"
-version = "0.1.0"
-description = "AI-powered agentic coding assistant CLI with multi-provider support, safety approvals, and remote access"
+version = "0.2.0"
+description = "AI-powered desktop coding assistant with Antigravity / Codex GUI, multi-provider support, and remote control"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -15,6 +15,7 @@ dependencies = [
     "prompt-toolkit>=3.0",
     "pyyaml>=6.0",
     "flask>=3.0",
+    "pywebview>=5.0",
 ]
 
 [project.optional-dependencies]

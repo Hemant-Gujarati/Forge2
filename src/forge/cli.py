@@ -12,26 +12,46 @@ if sys.platform == "win32":
 
 
 def main():
-    """Main entry point for the forge command."""
+    """Main entry point for Forge."""
     parser = argparse.ArgumentParser(
         prog="forge",
-        description="🔨 Forge — AI-powered coding assistant CLI",
+        description="🔨 Forge — AI-Powered Coding Assistant (Desktop GUI & CLI)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
-  forge                          Start interactive chat (default provider)
-  forge chat -p openai -m gpt-4o Chat with a specific provider/model
-  forge serve --poll             Start server with Telegram polling (no ngrok required!)
+  forge                          Launch Antigravity / Codex Desktop GUI
+  forge chat                     Start interactive terminal CLI chat
+  forge chat -p openai -m gpt-4o Chat with a specific model in terminal
+  forge serve --poll             Start background server for Telegram and Android
   forge models -p ollama         List available models
-  forge config --set-key openai sk-...   Set an API key
-  forge config --set-key telegram 1234:ABC... Set Telegram bot token
+  forge config --show            View configuration
         """,
+    )
+
+    parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="Launch terminal CLI mode instead of the Desktop GUI",
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # --- Chat command (also the default) ---
-    chat_parser = subparsers.add_parser("chat", help="Start interactive chat session")
+    # --- GUI command (Default) ---
+    gui_parser = subparsers.add_parser("gui", help="Start the Antigravity/Codex desktop GUI")
+    gui_parser.add_argument(
+        "--port",
+        type=int,
+        default=5055,
+        help="Port for local GUI server (default: 5055)",
+    )
+    gui_parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Open in default browser instead of native desktop window",
+    )
+
+    # --- Chat command ---
+    chat_parser = subparsers.add_parser("chat", help="Start interactive terminal CLI chat")
     chat_parser.add_argument(
         "-p",
         "--provider",
@@ -44,7 +64,9 @@ Examples:
     )
 
     # --- Serve command ---
-    serve_parser = subparsers.add_parser("serve", help="Start remote access server")
+    serve_parser = subparsers.add_parser(
+        "serve", help="Start remote access server for Telegram & Android"
+    )
     serve_parser.add_argument(
         "--host",
         default="0.0.0.0",
@@ -103,6 +125,10 @@ Examples:
 
     # Handle commands
     match args.command:
+        case "gui":
+            _handle_gui(args)
+        case "chat":
+            _handle_chat(args)
         case "serve":
             _handle_serve(args)
         case "models":
@@ -110,11 +136,24 @@ Examples:
         case "config":
             _handle_config(args)
         case _:
-            _handle_chat(args)
+            if args.cli:
+                _handle_chat(args)
+            else:
+                # Default is now Desktop GUI!
+                _handle_gui(args)
+
+
+def _handle_gui(args):
+    """Start desktop GUI."""
+    from forge.gui import launch_gui
+
+    port = getattr(args, "port", 5055)
+    force_web = getattr(args, "web", False)
+    launch_gui(port=port, force_web=force_web)
 
 
 def _handle_chat(args):
-    """Start interactive chat session."""
+    """Start interactive chat session in terminal."""
     from forge.app import ForgeApp
 
     provider = getattr(args, "provider", None)
@@ -154,7 +193,7 @@ def _handle_models(args):
     from forge.ui.display import print_models
 
     config = Config()
-    provider_name = args.provider or config.default_provider
+    provider_name = getattr(args, "provider", None) or config.default_provider
 
     try:
         provider = create_provider(provider_name, config)

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🔨 Forge — AI Coding Assistant</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <!-- Prism.js for syntax highlighting in code viewer -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">🔨</span>
+      <span>FORGE</span>
+      <span class="brand-tag">DESKTOP</span>
+    </div>
+
+    <div class="header-center">
+      <div class="workspace-badge" id="btn-select-folder" title="Click to change workspace folder">
+        <span>📁</span>
+        <span id="workspace-path">Loading workspace...</span>
+      </div>
+
+      <select class="model-selector" id="model-select">
+        <optgroup label="Local (Ollama)" id="ollama-models-group">
+          <option value="ollama:llama3.2">llama3.2 (Local)</option>
+        </optgroup>
+        <optgroup label="Cloud Providers">
+          <option value="openai:gpt-4o">OpenAI gpt-4o</option>
+          <option value="anthropic:claude-3-7-sonnet">Claude 3.7 Sonnet</option>
+          <option value="gemini:gemini-2.0-flash">Gemini 2.0 Flash</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="header-actions">
+      <div class="safe-mode-indicator" id="safe-mode-badge" title="Destructive actions require explicit approval">
+        <span>🛡️</span>
+        <span>Safe Mode</span>
+      </div>
+      <button class="btn-icon" id="btn-open-settings" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <div class="app-body">
+    <!-- Activity Bar (Far Left) -->
+    <nav class="activity-bar">
+      <button class="act-tab active" data-tab="chat" title="Chat & Agent">💬</button>
+      <button class="act-tab" data-tab="explorer" title="File Explorer">📁</button>
+      <button class="act-tab" data-tab="approvals" title="Pending Approvals">
+        🛡️
+        <span class="badge-count" id="nav-approval-count" style="display: none;">0</span>
+      </button>
+      <button class="act-tab" data-tab="history" title="Task History">🕒</button>
+      <button class="act-tab" data-tab="terminal" title="Terminal Logs">💻</button>
+    </nav>
+
+    <!-- Workspace Container (Split Screen) -->
+    <main class="workspace-container">
+      <!-- Left Split: Agent / Chat Pane -->
+      <section class="chat-pane">
+        <!-- Floating approval banner if action pending -->
+        <div class="approval-banner" id="approval-banner" style="display: none;">
+          <div class="approval-info">
+            <span>⚠️</span>
+            <span id="approval-banner-text">Agent requested file modification...</span>
+          </div>
+          <div class="approval-actions">
+            <button class="btn-approve" id="btn-banner-approve">Approve</button>
+            <button class="btn-reject" id="btn-banner-reject">Reject</button>
+          </div>
+        </div>
+
+        <!-- Messages Thread -->
+        <div class="messages-container" id="messages-container">
+          <div class="msg-row assistant">
+            <div class="msg-header">
+              <span>🔨 Forge Assistant</span>
+            </div>
+            <div class="msg-bubble">
+              Welcome to <strong>Forge</strong>! I am your AI coding assistant with direct access to inspect your codebase, edit code, run shell commands, and manage Git.<br /><br />
+              Ask me to build a feature, debug code, or create tests!
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Prompt Chips -->
+        <div class="prompt-chips">
+          <div class="chip" onclick="quickPrompt('Explain project structure')">📁 Project Overview</div>
+          <div class="chip" onclick="quickPrompt('Scan for bugs or improvements')">🔍 Find Bugs</div>
+          <div class="chip" onclick="quickPrompt('Check git status and pending changes')">🌿 Git Status</div>
+          <div class="chip" onclick="quickPrompt('Run tests and report results')">🧪 Run Tests</div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="chat-input-area">
+          <div class="input-box-wrapper">
+            <textarea
+              class="chat-input"
+              id="prompt-input"
+              placeholder="Ask Forge to write, edit, or run code... (Shift+Enter for newline)"
+              rows="2"
+            ></textarea>
+            <div class="input-toolbar">
+              <div class="toolbar-left">
+                <span>Tip: Safe Mode is ON (approvals required)</span>
+              </div>
+              <button class="btn-send" id="btn-send">
+                <span>Send</span>
+                <span>➤</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Split: Inspector Pane (Code Viewer / Diff / Explorer) -->
+      <section class="inspector-pane">
+        <!-- Tabs Header -->
+        <div class="inspector-tabs" id="inspector-tabs">
+          <button class="tab-btn active" data-pane="code-pane">📄 <span id="active-file-title">Code Viewer</span></button>
+          <button class="tab-btn" data-pane="diff-pane">🔍 Diff Review</button>
+          <button class="tab-btn" data-pane="explorer-pane">📂 Explorer</button>
+          <button class="tab-btn" data-pane="terminal-pane">💻 Terminal</button>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="inspector-body">
+          <!-- Code Viewer Panel -->
+          <div class="tab-panel active" id="code-pane">
+            <pre class="code-viewer" id="code-viewer-content">// Select a file from the explorer or wait for the agent to inspect files...</pre>
+          </div>
+
+          <!-- Diff Review Panel -->
+          <div class="tab-panel" id="diff-pane">
+            <div class="diff-container" id="diff-content">
+              <div style="color: var(--text-dim); text-align: center; margin-top: 40px;">
+                No pending code diffs to review.
+              </div>
+            </div>
+          </div>
+
+          <!-- File Explorer Panel -->
+          <div class="tab-panel" id="explorer-pane">
+            <div class="file-tree" id="file-tree-container">
+              <div style="color: var(--text-dim); padding: 12px;">Loading directory...</div>
+            </div>
+          </div>
+
+          <!-- Terminal Logs Panel -->
+          <div class="tab-panel" id="terminal-pane">
+            <pre class="code-viewer" id="terminal-logs">// Command outputs and tool logs will appear here...</pre>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>⚙️ Forge Settings</span>
+        <button class="btn-icon" id="btn-close-settings">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Default Provider</label>
+          <select class="form-input" id="setting-provider">
+            <option value="ollama">Ollama (Local Models)</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ollama Host</label>
+          <input type="text" class="form-input" id="setting-ollama-url" value="http://localhost:11434" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">OpenAI API Key</label>
+          <input type="password" class="form-input" id="setting-openai-key" placeholder="sk-..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Anthropic Claude API Key</label>
+          <input type="password" class="form-input" id="setting-anthropic-key" placeholder="sk-ant-..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Google Gemini API Key</label>
+          <input type="password" class="form-input" id="setting-gemini-key" placeholder="AIza..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telegram Bot Token (Phone Remote)</label>
+          <input type="password" class="form-input" id="setting-telegram-token" placeholder="123456:ABC-DEF..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-reject" id="btn-cancel-settings">Cancel</button>
+        <button class="btn-approve" id="btn-save-settings">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

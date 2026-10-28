@@ -15,6 +15,8 @@ if sys.platform == "win32":
 def build():
     root = Path(__file__).parent.resolve()
     entry_point = root / "src" / "forge" / "cli.py"
+    static_dir = root / "src" / "forge" / "gui" / "static"
+    separator = ";" if sys.platform == "win32" else ":"
 
     hidden_imports = [
         "forge",
@@ -23,6 +25,8 @@ def build():
         "forge.config",
         "forge.db",
         "forge.approvals",
+        "forge.gui",
+        "forge.gui.app",
         "forge.providers",
         "forge.providers.base",
         "forge.providers.ollama_provider",
@@ -46,6 +50,7 @@ def build():
         "rich",
         "prompt_toolkit",
         "httpx",
+        "webview",
     ]
 
     cmd = [
@@ -55,6 +60,7 @@ def build():
         "--name=forge",
         "--onefile",
         "--console",
+        f"--add-data={static_dir}{separator}forge/gui/static",
         f"--paths={root / 'src'}",
         "--clean",
         "--noconfirm",
@@ -65,7 +71,7 @@ def build():
 
     cmd.append(str(entry_point))
 
-    print(f"[Forge] Building standalone executable from {entry_point}...")
+    print(f"[Forge] Building standalone Antigravity / Codex GUI application from {entry_point}...")
     result = subprocess.run(cmd, cwd=root)
 
     if result.returncode == 0:

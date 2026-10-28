@@ -1,160 +1,98 @@
 # 🔨 Forge
 
-> AI-Powered Coding Assistant with Three Control Interfaces: CLI, Telegram, and Native Android.
+> AI-Powered Coding Assistant Desktop Application (GUI like Antigravity & ChatGPT Codex), with Telegram Remote & Native Android Control.
 
 ```
-Windows/Linux CLI ─┐
-Telegram bot ─────┼─> Forge Runtime on your PC ─> Ollama (Local) / Online LLMs + Tools
-Native Android ───┘
+Windows Desktop GUI App (.exe) ─┐
+Terminal CLI (`forge chat`) ────┼─> Forge Runtime on your PC ─> Ollama (Default Local) + Project Tools
+Telegram bot ───────────────────┤                               (Optional: OpenAI, Claude, Gemini)
+Native Android App ─────────────┘
 ```
 
-Your PC remains the **only machine** that runs the AI model, reads files, edits code, executes terminal commands, and manages Git. Telegram and the Native Android app act as remote controllers.
+Your PC remains the **only machine** running the AI model, accessing the filesystem, running terminal commands, and managing Git. Telegram and the Android app act as remote controllers.
 
 Repository: **[https://github.com/Hemant-Gujarati/Forge2](https://github.com/Hemant-Gujarati/Forge2)**
 
 ---
 
-## 🌟 Architecture & Highlights
+## 🎨 Antigravity & Codex Desktop GUI
 
-| Area | Choice | Cost |
-|------|--------|------|
-| **Desktop Core** | Python 3.11+ | Free |
-| **Local AI Engine** | Ollama (`llama3.2`, `codellama`, `deepseek-coder`, `qwen2.5-coder`) | Free |
-| **Online AI (Optional)** | OpenAI, Anthropic Claude, Google Gemini, Groq, OpenRouter | Optional API key |
-| **CLI Interface** | Rich terminal UI + `prompt-toolkit` | Free |
-| **Telegram Remote** | Telegram Bot API with Long Polling via `httpx` (no ngrok required) | Free |
-| **Android App** | Native Kotlin + Jetpack Compose (`android/`) | Free |
-| **Persistence** | SQLite (`~/.forge/forge.db`) for tasks, approvals, and sessions | Free |
-| **Config** | Human-readable YAML (`~/.forge/config.yaml`) | Free |
-| **Safety Engine** | Controlled approval system with pending, approved, rejected, and expired states | Free |
-| **Source Control** | Git + GitHub Actions CI | Free |
+When you launch `forge.exe` or type `forge`, Forge opens a **full native desktop window** with a modern dark-mode interface:
+
+- **Split-Screen Workspace**:
+  - **Left Pane (Agent & Chat)**: Real-time token streaming, tool call execution pills, collapsible thinking blocks, and quick prompt chips.
+  - **Right Pane (Code & Diff Reviewer)**: Tabbed code viewer with syntax highlighting (Prism.js), side-by-side / inline diff review for proposed changes, and live terminal command logs.
+- **Interactive File Explorer**: Click any file in your project directory to inspect it in the editor.
+- **Visual Safety Approvals**: Modifying actions (`write_file`, `edit_file`, `delete_file`, `run_command`, `git_commit`) show an interactive diff banner with one-click **Approve** and **Reject** buttons.
+- **Model Selector**: Switch between local Ollama models (`llama3.2`, `codellama`, `qwen2.5-coder`) and cloud providers (`gpt-4o`, `claude-3-7-sonnet`, `gemini-2.0-flash`) in one click.
 
 ---
 
-## 🛡️ Safety & Approval System (Phase 2 & 3)
+## 📦 How to Get and Run Forge
 
-By default, Forge operates in safe mode:
-- **Read-only actions** (`read_file`, `list_directory`, `find_files`, `search_text`, `git_status`, `git_diff`, `git_log`) execute immediately.
-- **Destructive / modifying actions** require explicit human approval before running:
-  - `write_file` (creating/overwriting files)
-  - `edit_file` (modifying code)
-  - `delete_file` (deleting files/directories)
-  - `run_command` (shell execution)
-  - `git_commit` (committing changes)
-
-### How Approvals Work:
-1. When the agent attempts a modifying action, a pending approval record is created in SQLite.
-2. The user is prompted in their active interface:
-   - **CLI**: Interactive `[y/N]` prompt
-   - **Telegram**: Notification with `/approve <id>` and `/reject <id>` commands
-   - **Android**: Interactive card in the Approvals tab with "Approve" and "Reject" buttons
-3. Once approved, the agent continues its autonomous loop: edit -> test -> report.
-
----
-
-## 📦 How to Get Forge on Any PC
-
-There are two easy ways to get Forge:
-
-### Option A: Standalone Windows Application (`forge.exe`) — Zero Setup Required!
+### Option A: Standalone Windows App (`forge.exe`) — No Setup Required!
 You do **not** need Python, Git, or pip installed.
 1. Download **`forge.exe`** from [GitHub Releases](https://github.com/Hemant-Gujarati/Forge2/releases).
-2. Double-click `forge.exe` or place it in your PATH / Desktop to run it anytime.
-3. To build the `.exe` yourself locally:
+2. **Double-click `forge.exe`** to open the Desktop GUI immediately!
+3. To compile `forge.exe` yourself:
    ```cmd
    build.bat
    ```
-   This generates `dist/forge.exe` in seconds.
 
 ### Option B: From Source (Python 3.10+)
 ```bash
 git clone https://github.com/Hemant-Gujarati/Forge2.git
 cd Forge2
 pip install -e .
+
+# Launch Desktop GUI
 forge
+
+# Or launch terminal CLI mode
+forge chat
 ```
 
 ---
 
-## 📱 Three Ways to Control Forge
+## 📱 Remote Control via Telegram & Android
 
-### 1. Windows / Linux Terminal CLI
-```bash
-# Clone & install
-git clone https://github.com/Hemant-Gujarati/Forge2.git
-cd Forge2
-pip install -e .
-
-# Launch interactive coding session (Ollama default)
-forge
-
-# Or use specific models
-forge chat -p ollama -m llama3.2
-forge chat -p openai -m gpt-4o
-forge chat -p anthropic -m claude-3-7-sonnet
-forge chat -p gemini -m gemini-2.0-flash
-
-# View config & models
-forge config --show
-forge models -p ollama
-```
-
-### 2. Telegram Remote Control (Direct Long Polling)
+### 1. Telegram Remote (Direct Long Polling)
 No public IP, port-forwarding, or ngrok required:
+```bash
+# Set your bot token from @BotFather
+forge config --set-key telegram <YOUR_BOT_TOKEN>
 
-1. Create a bot with `@BotFather` on Telegram to receive your `bot_token`.
-2. Configure token and your chat ID:
-   ```bash
-   forge config --set-key telegram <YOUR_BOT_TOKEN>
-   ```
-3. Start the server in long-polling mode:
-   ```bash
-   forge serve --poll
-   ```
-4. Commands supported in Telegram:
-   - `/help` - Display available commands
-   - `/new <task>` - Start a new autonomous background coding task
-   - `/tasks` - View recent tasks and their statuses
-   - `/status` - Check current PC runtime and working directory
-   - `/cancel <task_id>` - Abort an ongoing background task
-   - `/approve <id>` - Approve a pending file edit, command, or commit
-   - `/reject <id>` - Reject a pending action
+# Start background server
+forge serve --poll
+```
+Message your bot from Telegram on your phone:
+- `/new Create a modern dashboard using HTML/CSS`
+- `/approve <id>` or `/reject <id>`
+- `/status` and `/tasks`
 
-### 3. Native Android App (`android/`)
-Located in the [`android/`](file:///android/) directory:
-- Built with **Kotlin + Jetpack Compose + Material 3**.
-- Direct connection over private Wi-Fi / VPN (Tailscale, WireGuard) to your desktop's Forge REST API.
-- **Screens**:
-  1. **Pairing**: Connect via desktop IP:port and secure 6-digit or UUID pairing token.
-  2. **Chat / Tasks**: Send coding prompts and receive real-time updates.
-  3. **Task Detail**: View task execution progress, full stdout/stderr, and tool logs.
-  4. **Approvals Screen**: View pending write/command/commit requests with one-tap Approve/Reject.
-  5. **Recent Tasks**: History of all tasks stored in desktop SQLite.
-  6. **Settings**: Connection status, token management, and desktop health.
+### 2. Native Android App (`android/`)
+Native Kotlin + Jetpack Compose app in the [`android/`](file:///android/) folder:
+- Open `android` in Android Studio and run on your device.
+- Connect to your PC via local Wi-Fi or private VPN (Tailscale/WireGuard) to view logs, chat with Forge, and tap Approve/Reject on action cards.
 
 ---
 
-## 🌐 Desktop REST API Endpoints (Phase 5)
+## 🛡️ Safety & Approval Engine
 
-The Forge server exposes a secure authenticated API for Android and remote controllers:
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `GET` | `/health` | Health check & provider status | None |
-| `POST` | `/v1/pair` | Generate or verify pairing token | None / Pairing Token |
-| `POST` | `/v1/tasks` | Submit a new background task | Bearer Token |
-| `GET` | `/v1/tasks` | List recent tasks | Bearer Token |
-| `GET` | `/v1/tasks/{id}` | Get task details, status, and logs | Bearer Token |
-| `POST` | `/v1/tasks/{id}/cancel` | Cancel a running task | Bearer Token |
-| `GET` | `/v1/approvals` | List pending approvals | Bearer Token |
-| `POST` | `/v1/approvals/{id}/approve` | Approve a pending action | Bearer Token |
-| `POST` | `/v1/approvals/{id}/reject` | Reject a pending action | Bearer Token |
+Forge operates in safe mode by default:
+- **Read-only actions** (`read_file`, `list_directory`, `find_files`, `search_text`, `git_status`, `git_diff`, `git_log`) execute immediately.
+- **Modifying / destructive actions** require explicit human approval before running:
+  - `write_file` (creating/overwriting files)
+  - `edit_file` (modifying code)
+  - `delete_file` (deleting files/directories)
+  - `run_command` (shell execution)
+  - `git_commit` (committing changes)
 
 ---
 
 ## 🧪 Testing & CI
 
-Run all 29 unit and integration tests with pytest in one command:
+Run all 34 automated unit and integration tests with pytest in one command:
 
 ```bash
 pytest
@@ -166,9 +104,6 @@ Run code formatting and linting:
 ruff check .
 ruff format .
 ```
-
-GitHub Actions automatically runs tests on every push to `main`:
-[`.github/workflows/test.yml`](file:///.github/workflows/test.yml)
 
 ---
 
