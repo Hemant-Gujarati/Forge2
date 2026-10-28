@@ -8,9 +8,11 @@ from typing import Any
 CONFIG_DIR = Path.home() / ".forge"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
 SESSIONS_DIR = CONFIG_DIR / "sessions"
+DB_PATH = CONFIG_DIR / "forge.db"
 
 DEFAULT_CONFIG = {
     "default_provider": "ollama",
+    "safe_mode": True,  # Require approval for destructive operations (write, edit, delete, run_command, git_commit)
     "providers": {
         "openai": {
             "api_key": "",
@@ -35,6 +37,7 @@ DEFAULT_CONFIG = {
     "server": {
         "host": "0.0.0.0",
         "port": 5000,
+        "pairing_token": "",  # Secret token for pairing remote Android devices
         "whatsapp": {
             "account_sid": "",
             "auth_token": "",
@@ -47,6 +50,11 @@ DEFAULT_CONFIG = {
         },
     },
 }
+
+
+class ConfigValidationError(Exception):
+    """Raised when configuration validation fails."""
+    pass
 
 
 class Config:
@@ -99,6 +107,28 @@ class Config:
         with open(self.config_path, "w") as f:
             yaml.dump(self.data, f, default_flow_style=False, sort_keys=False)
 
+    def validate(self) -> list[str]:
+        """Validate configuration settings and return list of warnings/issues."""
+        issues = []
+        # Check provider
+        prov = self.default_provider
+        providers = self.data.get("providers", {})
+        if prov not in providers:
+            issues.append(f"Default provider '{prov}' is not defined under providers in configuration.")
+
+        # Check server settings
+        server = self.data.get("server", {})
+        port = server.get("port")
+        if not isinstance(port, int) or port < 1 or port > 65535:
+            issues.append(f"Invalid server port: {port}. Must be an integer between 1 and 65535.")
+
+        tg = server.get("telegram", {})
+        chat_ids = tg.get("allowed_chat_ids", [])
+        if not isinstance(chat_ids, list):
+            issues.append("server.telegram.allowed_chat_ids must be a list of integers.")
+
+        return issues
+
     def _deep_merge(self, base: dict, override: dict) -> dict:
         """Deep merge override into a copy of base."""
         import copy
@@ -122,6 +152,15 @@ class Config:
     def default_provider(self, value: str):
         self.data["default_provider"] = value
 
+    @property
+    def safe_mode(self) -> bool:
+        """Whether destructive operations require user approval."""
+        return bool(self.data.get("safe_mode", True))
+
+    @safe_mode.setter
+    def safe_mode(self, value: bool):
+        self.data["safe_mode"] = bool(value)
+
     def get(self, key: str, default: Any = None) -> Any:
         """Get a top-level config value."""
         return self.data.get(key, default)
@@ -135,9 +174,11 @@ class Config:
         elif target_lower == "whatsapp":
             self.data.setdefault("server", {}).setdefault("whatsapp", {})["auth_token"] = api_key
             self.save()
+        elif target_lower == "pairing_token":
+            self.data.setdefault("server", {})["pairing_token"] = api_key
+            self.save()
         else:
             if target_lower not in self.data.get("providers", {}):
-                # Dynamically allow adding custom providers
                 self.data.setdefault("providers", {})[target_lower] = {
                     "api_key": api_key,
                     "base_url": "https://api.openai.com/v1",
